@@ -17,3 +17,13 @@
 - First signal check (share of points with NIC ≤ 6): BAL 15.8 %, MEA 9.1 %, BLK 8.5 %, EMED 4.7 %, INPK 4.7 %, CEU 4.1 %, CUS 5.4 %, AUS 1.7 %. BAL alt_geom availability drops to 88 % (vs 97–99 % elsewhere).
 - Day list: 1st & 15th of each month 2024-01 → 2026-10 (68 days), dev days first. Fetch runs in background (`gist.data.fetch_days`), resumable, raw deleted after parse.
 - Traces carry no receiver location (rr_lat/lon) → LF_horizon dropped; independent-position check will use adsb.lol `mlatonly` releases instead (Phase 3).
+
+## 2026-10-27 — Phase 3
+- Wind: naive wind triangle from forward-filled tas/heading is useless (p99 several hundred kt in controls). Fixed by using readsb ws/wd only on points carrying a *fresh* details object, excluding turning steps (track range ≥ 5°) and taking consensus per H3-res3 cell × 5 min × 6000 ft band (≥ 3 trusted aircraft). Median deviation 4–9 kt; still heavy-tailed over CUS → wind is a model feature, **not** an LF.
+- Spoof-sensitive features validated on 2026-10-25 (rate per 10k steps with NIC ≥ 7):
+  - |alt_geom − alt_baro − neighbour median| > 1000 ft: INPK 23.2, MEA 7.7, EMED 1.4, BLK 1.1 vs CUS 0.06, CEU 0.02, AUS 0.
+  - Position cluster (≥ 3 aircraft in same 0.005° cell within 60 s, ≥ 5000 ft altitude spread): MEA 11.2, INPK 1.8 vs controls ≈ 0. (0.05° grid gave false clusters at airports — stacked arrivals.)
+  - Position jumps > 20 km with NIC ≥ 7: 0 in all controls.
+- LFs: 10 defined, `mlat` held out for evaluation. Region names never used inside LFs.
+- Gate 3: coverage 77–92 % in all regions ✓; CUS 99.9 % / AUS 99.6 % normal ✓; **CEU 98.7 % normal** — 1.2 % jammed traced to (a) 14 long-haul widebodies with all-day degraded NIC (post-interference carry-over) and (b) a cluster at 48–50°N 13–14°E. Not tuned away. **Decision: CEU is reported as "low-interference Europe", clean controls = CUS + AUS.**
+- Label-model LF accuracy estimates: nic_zero .998, cell_jam .995, nic_drop .94, gdiff .80, teleport .79, pos_loss .68, cluster .30 (tiny coverage, no co-firing LF).

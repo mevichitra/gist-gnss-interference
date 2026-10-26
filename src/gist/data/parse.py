@@ -114,7 +114,7 @@ def parse_shard(files: list[Path], out: Path) -> int:
     return df.height
 
 
-def parse_day(day_dir: Path, out_dir: Path, workers: int = 6, shard_size: int = 2000) -> int:
+def parse_day(day_dir: Path, out_dir: Path, workers: int = 4, shard_size: int = 2000) -> int:
     files = sorted(day_dir.glob("traces/*/trace_full_*.json"))
     out_dir.mkdir(parents=True, exist_ok=True)
     shards = [files[i:i + shard_size] for i in range(0, len(files), shard_size)]

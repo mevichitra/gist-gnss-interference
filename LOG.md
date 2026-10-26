@@ -27,3 +27,11 @@
 - LFs: 10 defined, `mlat` held out for evaluation. Region names never used inside LFs.
 - Gate 3: coverage 77–92 % in all regions ✓; CUS 99.9 % / AUS 99.6 % normal ✓; **CEU 98.7 % normal** — 1.2 % jammed traced to (a) 14 long-haul widebodies with all-day degraded NIC (post-interference carry-over) and (b) a cluster at 48–50°N 13–14°E. Not tuned away. **Decision: CEU is reported as "low-interference Europe", clean controls = CUS + AUS.**
 - Label-model LF accuracy estimates: nic_zero .998, cell_jam .995, nic_drop .94, gdiff .80, teleport .79, pos_loss .68, cluster .30 (tiny coverage, no co-firing LF).
+
+## 2026-10-27 — Phase 4
+- Simulator injects at step-feature level and recomputes neighbour/cluster features afterwards. Jammer: Friis + 4/3-Earth LOS + elevation-dependent antenna gain; per-receiver tolerance N(−115 dBW, 3 dB); NIC 0 + probabilistic position loss when above tolerance, NIC 1–6 within 6 dB below. Spoofer: capture at margin > −5 dB, sticky capture, static/circle/drift fake trajectories, NIC forced ≥ 8, alt_geom offset, wind/gs consistent with the fake track.
+- First EIRP prior (1–100 W) affected a median 0.4 % of aircraft per scene → unrealistic. Raised to 20–50 dBW jammers / 10–40 dBW spoofers (Liu: ~1 kW for KDEN): median 41 % affected (q10 5 %, q90 82 %).
+- NLS bugs found & fixed: EIRP grid too low (local minima), and per-window median positions (aircraft move ~140 km / window). Per-step observations fixed it.
+- Results on 37 simulated jammer scenes (realistic noise): NLS median 16.1 km (p95 46.9), centroid 97.6 km, horizon 114.3 km.
+- **Gate 4 ✓:** noise-free ground jammers (σ_tol = 0, h = 10 m): NLS median 2.4 km (11/12 < 6 km).
+- Infra: GitHub release downloads stall → per-part resumable curl with stall timeout. Machine has 8 GB RAM and ~5 GB swap in use when parse + analysis overlap → run heavy jobs sequentially, parse workers 4.

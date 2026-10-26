@@ -50,12 +50,33 @@ def download_day(day: date, out_root: Path = RAW) -> Path:
         raise RuntimeError(f"free disk {free_gb():.0f} GB < {MIN_FREE_GB} GB cap")
     assets = pick_release(day)
     out.mkdir(parents=True, exist_ok=True)
-    urls = " ".join(f"'{a['browser_download_url']}'" for a in assets)
-    # curl concatenates the parts in order into tar's stdin.
-    cmd = f"curl -sSfL --retry 5 {urls} | tar -xf - -C '{out}'"
-    subprocess.run(cmd, shell=True, check=True)
+    parts = []
+    for a in assets:
+        part = out_root / a["name"]
+        _fetch_resumable(a["browser_download_url"], part, a["size"])
+        parts.append(part)
+    with subprocess.Popen(["tar", "-xf", "-", "-C", str(out)], stdin=subprocess.PIPE) as tar:
+        for part in parts:
+            with part.open("rb") as f:
+                shutil.copyfileobj(f, tar.stdin, 1 << 20)
+        tar.stdin.close()
+    if tar.returncode:
+        raise RuntimeError(f"tar failed for {day}")
+    for part in parts:
+        part.unlink()
     (out / ".done").touch()
     return out
+
+
+def _fetch_resumable(url: str, dest: Path, size: int, attempts: int = 20) -> None:
+    """curl with resume (-C -) and stall detection; retried until the file has the expected size."""
+    for _ in range(attempts):
+        if dest.exists() and dest.stat().st_size == size:
+            return
+        subprocess.run(["curl", "-sSfL", "-C", "-", "--speed-limit", "200000", "--speed-time", "45",
+                        "--connect-timeout", "30", "-o", str(dest), url], check=False)
+    if not dest.exists() or dest.stat().st_size != size:
+        raise RuntimeError(f"download incomplete: {dest.name}")
 
 
 def main() -> None:

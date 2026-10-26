@@ -132,7 +132,6 @@ def neighbor_features(df: pl.DataFrame) -> pl.DataFrame:
     )
     cons = df.group_by("cell3", "slot", "band").agg(
         n_band=pl.col("hex").filter(trusted).n_unique(),
-        n_neigh=pl.col("hex").n_unique(),
         gdiff_med=pl.col("gdiff").filter(trusted & pl.col("version").ge(1)).median(),
         wu_med=pl.col("wu").filter(trusted).median(),
         wv_med=pl.col("wv").filter(trusted).median(),

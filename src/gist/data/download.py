@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import shutil
 import subprocess
+import time
 from datetime import date
 from pathlib import Path
 
@@ -68,13 +69,21 @@ def download_day(day: date, out_root: Path = RAW) -> Path:
     return out
 
 
-def _fetch_resumable(url: str, dest: Path, size: int, attempts: int = 20) -> None:
-    """curl with resume (-C -) and stall detection; retried until the file has the expected size."""
-    for _ in range(attempts):
+def _fetch_resumable(url: str, dest: Path, size: int, attempts: int = 40) -> None:
+    """curl with resume (-C -) and stall detection; retried until the file has the expected size.
+
+    GitHub throttles release downloads after heavy use (observed: bytes/s for tens of minutes),
+    so stalled attempts back off exponentially up to 10 minutes before resuming.
+    """
+    for k in range(attempts):
         if dest.exists() and dest.stat().st_size == size:
             return
-        subprocess.run(["curl", "-sSfL", "-C", "-", "--speed-limit", "200000", "--speed-time", "45",
+        before = dest.stat().st_size if dest.exists() else 0
+        subprocess.run(["curl", "-sSfL", "-C", "-", "--speed-limit", "500000", "--speed-time", "60",
                         "--connect-timeout", "30", "-o", str(dest), url], check=False)
+        gained = (dest.stat().st_size if dest.exists() else 0) - before
+        if gained < 50_000_000:
+            time.sleep(min(600, 30 * 2 ** min(k, 5)))
     if not dest.exists() or dest.stat().st_size != size:
         raise RuntimeError(f"download incomplete: {dest.name}")
 

@@ -20,7 +20,7 @@ from gist.features.windows import WIN_STEPS
 from gist.sim import propagation as P
 
 BOX_DEG = 3.0
-MAX_NODES = 384
+MAX_NODES = 256
 
 STEP_FEATURES = [
     # name, scale, clip

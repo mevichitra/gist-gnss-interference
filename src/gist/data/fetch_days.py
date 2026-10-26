@@ -26,6 +26,8 @@ def all_days() -> list[str]:
                 day = date(y, m, d)
                 if day <= date(2026, 10, 25):
                     days.append(day.isoformat())
+    # 1st-of-month days before 15ths so every month is covered early if downloads are slow.
+    days.sort(key=lambda d: (d[8:] != "01", d))
     return DEV_DAYS + [d for d in days if d not in DEV_DAYS]
 
 

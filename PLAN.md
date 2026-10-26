@@ -57,7 +57,9 @@ configs/  notebooks/  tests/  paper/ (LaTeX)  report/ (college)  data_store/ (gi
 
 ## 5. Data (Phase 1–2)
 
-### 5.1 Primary source — ADS-B Exchange free samples (no account needed)
+> **Revised 2026-10-27 (Phase 1):** primary source is now **adsb.lol globe_history (ODbL-1.0)** — daily releases (every day, not just the 1st), full per-aircraft readsb traces, plus a separate MLAT-only release. ADS-B Exchange samples are "for testing and evaluation" and their policy bars derivative works, so they are **not used for any result**. See `DATA_LICENSE.md`. The field notes below still apply (same readsb format).
+
+### 5.1 (superseded) ADS-B Exchange free samples
 - URL pattern (verified 2026-10-26): `https://samples.adsbexchange.com/readsb-hist/YYYY/MM/01/HHMMSSZ.json.gz` — global snapshot every 5 s, **1st day of each month only**. Server returns plain JSON (~4.6 MB/snapshot, ~10k aircraft).
 - Fields present (verified): `hex, flight, lat, lon, alt_baro, alt_geom, gs, ias, tas, mach, track, mag_heading, true_heading, roll, baro_rate, geom_rate, nic, nac_p, nac_v, sil, sil_type, gva, sda, nic_baro, rc, version, mlat, tisb, rssi, seen, seen_pos, gpsOkBefore, gpsOkLat, gpsOkLon, lastPosition, rr_lat, rr_lon, ws, wd, oat, squawk, category, t, dbFlags`.
   - `gpsOkBefore/gpsOkLat/gpsOkLon` = readsb's own GPS-loss heuristic → weak label + baseline.

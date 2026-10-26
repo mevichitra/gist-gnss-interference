@@ -1,0 +1,36 @@
+# Seed catalogue of GNSS-interference zones / events used for real-world evaluation.
+# Approximate sources are region-level unless stated; uncertainty_km reflects that.
+# Phase 3 augments this list with data-driven events (hex-hours with sustained NIC collapse
+# or spoof clusters) — those are tagged origin: discovered.
+anchors:
+  - id: BAL_KGD
+    region: BAL
+    type: jam
+    approx_source: {lat: 54.71, lon: 20.51, uncertainty_km: 150}   # Kaliningrad oblast
+    persistent: true
+    source_url: https://www.gpsjam.org/
+  - id: EMED_BEY
+    region: EMED
+    type: spoof
+    approx_source: {lat: 33.5, lon: 35.5, uncertainty_km: 200}     # Lebanon/Israel area; spoof points near OLBA reported
+    persistent: true
+    source_url: https://migflug.com/jetflights/gps-spoofing-up-193-pilots-are-flying-blind/
+  - id: MEA_IRQ
+    region: MEA
+    type: spoof
+    approx_source: {lat: 34.0, lon: 45.0, uncertainty_km: 400}     # Baghdad/Erbil corridor
+    persistent: true
+    source_url: https://migflug.com/jetflights/gps-spoofing-up-193-pilots-are-flying-blind/
+  - id: BLK_CRIMEA
+    region: BLK
+    type: jam
+    approx_source: {lat: 44.9, lon: 34.1, uncertainty_km: 250}
+    persistent: true
+    source_url: https://www.gpsjam.org/
+  - id: KDEN_2022
+    region: CONUS
+    type: jam
+    dates: ["2022-01-21", "2022-01-22"]
+    approx_source: null          # exact location in Aviles & Van Dyke (DOT/FAA 2023), cited by Liu et al. 2025; fill from PDF
+    needs: opensky                # adsb.lol archive starts 2023
+    source_url: https://navi.ion.org/content/72/3/navi.716

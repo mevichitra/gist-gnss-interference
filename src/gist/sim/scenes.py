@@ -29,7 +29,7 @@ def clean_scene(steps: pl.DataFrame, windows: pl.DataFrame, rng: np.random.Gener
         & pl.col("lon_any").is_between(lon0 - dlon, lon0 + dlon)
     )
     # Remove aircraft that already look degraded, so injected truth is the only interference.
-    bad = windows.filter((pl.col("win") == win) & (pl.col("label") != 0)).select("hex")
+    bad = windows.filter((pl.col("win") == win) & (pl.col("label") > 0)).select("hex")
     scene = scene.join(bad, on="hex", how="anti")
     if scene["hex"].n_unique() < MIN_AIRCRAFT:
         return None

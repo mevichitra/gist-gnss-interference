@@ -35,3 +35,8 @@
 - Results on 37 simulated jammer scenes (realistic noise): NLS median 16.1 km (p95 46.9), centroid 97.6 km, horizon 114.3 km.
 - **Gate 4 ✓:** noise-free ground jammers (σ_tol = 0, h = 10 m): NLS median 2.4 km (11/12 < 6 km).
 - Infra: GitHub release downloads stall → per-part resumable curl with stall timeout. Machine has 8 GB RAM and ~5 GB swap in use when parse + analysis overlap → run heavy jobs sequentially, parse workers 4.
+
+## 2026-10-27 — Phase 5 (in progress)
+- **Label-model bug:** windows where all LFs abstain got the Dawid–Skene posterior of the all-abstain pattern, which favours SPOOFED (highest abstention class) → 12.8 % "spoofed" in AUS on 2026-01-01. Fix: uncovered windows are unlabelled (label −1, NaN probs). After fix, controls ≥ 99.6 % normal on both days.
+- Download throttling: GitHub release assets dropped to bytes/s after ~7 GB (general bandwidth 25 MB/s). Fetcher backs off up to 10 min per stalled attempt; 1st-of-month days prioritised over 15ths.
+- Localization head memory: 41×41 grid × stride 2 needed 2.3 GB autograd and took 17 min/step under swap. 21×21 grid (40 km cells, soft-argmax refinement), stride 4, ≤ 256 nodes: 0.36 GB, 0.05 s/step.

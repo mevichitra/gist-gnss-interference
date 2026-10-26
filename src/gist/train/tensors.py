@@ -54,7 +54,8 @@ def step_matrix(df: pl.DataFrame) -> np.ndarray:
             v = np.clip(v, *clip)
         cols.append(np.nan_to_num(v, nan=0.0))
     for name in MISSING_FLAGS:
-        cols.append(df[name].is_null().to_numpy().astype(np.float32) | np.isnan(df[name].cast(pl.Float32).fill_null(np.nan).to_numpy()))
+        missing = df[name].is_null().to_numpy() | np.isnan(df[name].cast(pl.Float32).fill_null(np.nan).to_numpy())
+        cols.append(missing.astype(np.float32))
     return np.stack(cols, 1).astype(np.float32)
 
 

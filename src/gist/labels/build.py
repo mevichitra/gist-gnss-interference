@@ -16,7 +16,7 @@ import polars as pl
 from gist.features.physics import build_steps
 from gist.features.windows import window_table
 from gist.labels.label_model import ABSTAIN, LabelModel
-from gist.labels.lfs import apply_lfs, vote_matrix
+from gist.labels.lfs import TRAIN_LFS, apply_lfs, vote_matrix
 
 POINTS = Path("data_store/points")
 STEPS = Path("data_store/steps")
@@ -38,8 +38,8 @@ def build_day(day: str) -> Path:
 
 def fit_and_label(max_rows: int = 3_000_000, seed: int = 0) -> LabelModel:
     files = sorted(WINDOWS.glob("*.parquet"))
-    w = pl.concat([pl.read_parquet(f) for f in files], how="vertical_relaxed")
-    votes = vote_matrix(w)
+    lf_cols = [f"lf_{k}" for k in TRAIN_LFS]
+    votes = np.concatenate([vote_matrix(pl.read_parquet(f, columns=lf_cols)) for f in files])
     rng = np.random.default_rng(seed)
     idx = rng.permutation(len(votes))[:max_rows]
     lm = LabelModel().fit(votes[idx])
@@ -48,9 +48,15 @@ def fit_and_label(max_rows: int = 3_000_000, seed: int = 0) -> LabelModel:
         d = pl.read_parquet(f)
         v = vote_matrix(d)
         p = lm.predict_proba(v)
+        covered = (v != ABSTAIN).any(1)
+        # Windows where every LF abstains carry no evidence; the Dawid–Skene posterior for the
+        # all-abstain pattern just favours the class with the highest abstention rate (SPOOFED),
+        # so they stay unlabelled (label −1, NaN probabilities).
+        p[~covered] = np.nan
+        label = np.where(covered, np.nan_to_num(p).argmax(1), -1)
         d.with_columns(
             p_normal=p[:, 0], p_jam=p[:, 1], p_spoof=p[:, 2],
-            covered=pl.Series((v != ABSTAIN).any(1)), label=pl.Series(p.argmax(1)).cast(pl.Int8),
+            covered=pl.Series(covered), label=pl.Series(label).cast(pl.Int8),
         ).write_parquet(f, compression="zstd")
     return lm
 

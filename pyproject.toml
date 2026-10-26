@@ -1,0 +1,37 @@
+[project]
+name = "gist"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "mevichitra", email = "mevichitra@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "duckdb>=2.0.0",
+    "folium>=0.20.0",
+    "h3>=4.5.0",
+    "httpx>=0.28.1",
+    "matplotlib>=3.11.2",
+    "numpy>=2.5.4",
+    "polars>=2.1.0",
+    "pyarrow>=26.0.0",
+    "pyproj>=3.8.0",
+    "pyyaml>=6.0.3",
+    "scikit-learn>=1.9.1",
+    "scipy>=1.18.1",
+    "tensorboard>=2.21.0",
+    "torch>=2.14.1",
+    "tqdm>=4.70.1",
+]
+
+
+[build-system]
+requires = ["uv_build>=0.11.1,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.17.2",
+]

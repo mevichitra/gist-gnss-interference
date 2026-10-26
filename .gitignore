@@ -1,0 +1,11 @@
+data_store/
+runs/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+paper/*.aux
+paper/*.log
+paper/*.out
+report/*.aux
+report/*.log

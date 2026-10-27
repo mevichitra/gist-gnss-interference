@@ -48,3 +48,11 @@
 - Localization (86 sim jammers): GIST coarse soft-argmax 40.0 km median → physics-guided coarse-to-fine refinement 22.1 km (p95 173); NLS 23.9 (p95 241); centroid 85.5; horizon 102.6.
 - Diagnostics: oracle step labels only reach 17.2 km median → sims are information-limited (tolerance spread, unknown emitter height); searching emitter height hurts with model probabilities (39.6) but helps the oracle tail (p95 98).
 - Planned robustness experiment: keep benign low-NIC aircraft and co-present spoofed aircraft in localization scenes (current clean-scene sampling removes them, which flatters NLS).
+
+## 2026-10-27 — Interim day-split model (gist_s0; train 2024-07-01 + 2025-01-01, val 2025-07-01, test 2026-01-01 + 2026-10-25)
+- Test (held-out 2026): real macro-F1 0.876, jam AP 0.994, jam R@1%FPR 0.991, spoof AP 0.693, spoof R@1%FPR 0.826 (374 spoof windows); sim macro-F1 0.997.
+- Baselines same test: gpsjam spoof R@1% 0.01 / jam AP 0.858; iForest 0.056 / 0.797; LSTM-AE 0.064 / 0.369.
+- Localization, 334 sim jammers: GIST refined 18.4 km median (p95 164) vs NLS 26.0 (p95 302), centroid 105, horizon 121.
+- With 5 % benign low-NIC distractors (160 scenes): GIST 27.2 km (p95 182) vs NLS 42.5 (p95 315).
+- Real EMED 2024-07-01 (training-period day): jammer estimates cluster on the Lebanon–Israel coast near the reported source region (qualitative only).
+- Interim demo map published (claude.ai artifact, seed 0). Final pipeline (`scripts/final.sh`) will regenerate everything with 34 days × 3 seeds.

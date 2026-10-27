@@ -9,3 +9,12 @@ paper/*.log
 paper/*.out
 report/*.aux
 report/*.log
+paper/*.bbl
+paper/*.blg
+report/*.bbl
+report/*.blg
+report/*.toc
+report/*.lof
+report/*.lot
+report/*.out
+viz_build/*.json

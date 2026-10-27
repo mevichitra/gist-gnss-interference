@@ -176,6 +176,8 @@ class GIST(nn.Module):
         self.step_head = nn.Sequential(nn.LayerNorm(2 * d), nn.Linear(2 * d, d), nn.GELU(), nn.Linear(d, 3))
         self.loc = PhysicsLocalizer(d, use_physics, use_learned_loc)
         self.recon = nn.Linear(d, f_in)   # used by masked pretraining
+        # Feature mask (saved with the checkpoint) so input ablations apply at train *and* test time.
+        self.register_buffer("feat_mask", torch.ones(f_in))
 
     def encode(self, x, mask):
         b, n, t, f = x.shape
@@ -183,7 +185,7 @@ class GIST(nn.Module):
         return steps.view(b, n, t, -1), win.view(b, n, -1)
 
     def forward(self, batch, localize: bool = True):
-        x, mask, node_mask = batch["x"], batch["mask"], batch["node_mask"]
+        x, mask, node_mask = batch["x"] * self.feat_mask, batch["mask"], batch["node_mask"]
         steps, z = self.encode(x, mask)
         alt_km = (batch["h_m"] * mask).sum(-1) / mask.sum(-1).clamp(min=1) / 1000
         for layer in self.graph:

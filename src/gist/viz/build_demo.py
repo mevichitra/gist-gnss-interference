@@ -19,7 +19,8 @@ from gist.data.regions import REGIONS
 def aggregate(run: Path, day: str) -> dict:
     pred = pl.read_parquet(run / f"pred_{day}.parquet")
     wins = pl.read_parquet(f"data_store/windows/{day}.parquet", columns=["hex", "win", "nic_low_frac"])
-    df = pred.join(wins, on=["hex", "win"], how="left").with_columns(hour=(pl.col("win") // 6).cast(pl.Int16))
+    # win = unix_time // 600 → hour of day (UTC)
+    df = pred.join(wins, on=["hex", "win"], how="left").with_columns(hour=((pl.col("win") % 144) // 6).cast(pl.Int16))
     df = df.with_columns(cell=pl.struct("lat", "lon").map_elements(
         lambda r: h3.latlng_to_cell(r["lat"], r["lon"], 4), return_dtype=pl.Utf8))
     agg = (df.group_by("region", "cell", "hour")
@@ -34,7 +35,7 @@ def aggregate(run: Path, day: str) -> dict:
     em_file = run / f"emitters_{day}.parquet"
     emitters = []
     if em_file.exists():
-        em = pl.read_parquet(em_file).with_columns(hour=(pl.col("win") // 6))
+        em = pl.read_parquet(em_file).with_columns(hour=((pl.col("win") % 144) // 6))
         emitters = [[r["region"], int(r["hour"]), round(r["lat"], 3), round(r["lon"], 3), round(r["jam_steps"])]
                     for r in em.iter_rows(named=True)]
     summary = (df.group_by("region").agg(n=pl.len(), jam=(pl.col("p_jam") > 0.5).mean(), spoof=(pl.col("p_spoof") > 0.5).mean(),

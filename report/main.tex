@@ -1,0 +1,157 @@
+\documentclass[12pt,a4paper,oneside]{report}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb,graphicx,booktabs,hyperref,xcolor,setspace,float,caption}
+\onehalfspacing
+\graphicspath{{../paper/figures/}}
+\input{../paper/tables/macros.tex}
+\newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+
+\begin{document}
+\begin{titlepage}\centering
+{\Large <<COLLEGE>>\par}\vspace{1cm}
+{\large Final Year Project Report\par}\vspace{2cm}
+{\huge\bfseries GIST: Detecting, Classifying and Localizing GNSS Jamming and Spoofing from Crowdsourced ADS-B with Deep Learning\par}\vspace{2cm}
+{\large Submitted by\\ \textbf{<<AUTHOR>>} (<<ROLL\_NO>>)\par}\vspace{1cm}
+{\large Under the guidance of\\ \textbf{<<GUIDE>>}\par}\vfill
+{\large <<DEPARTMENT>>\\ <<MONTH YEAR>>\par}
+\end{titlepage}
+
+\chapter*{Certificate}
+\todo{College certificate text, signed by the guide and head of department.}
+
+\chapter*{Acknowledgements}
+\todo{Acknowledgements.} The ADS-B data used in this work is provided by ADSB.lol and its contributors under the Open Database License.
+
+\chapter*{Abstract}
+GNSS (GPS) interference affects thousands of flights every day in several regions of the world. Two different threats are
+involved: \emph{jamming}, which denies the satellite signal, and \emph{spoofing}, which replaces it with a false one.
+Public monitoring maps threshold the Navigation Integrity Category (NIC) broadcast by aircraft; this detects jamming but
+misses spoofing, since a spoofed receiver reports high integrity. This project builds GIST, a deep learning system that
+treats every aircraft as a remote GNSS sensor. It derives physics-consistency features that a spoofer cannot fake cheaply,
+builds weak labels from labeling functions and a generative label model so that no manual annotation is needed, trains a
+trajectory Transformer with spatial graph attention to classify each aircraft-window as normal, jammed or spoofed, and
+localizes jammers with a differentiable radio-propagation layer trained on simulated emitters injected into real traffic.
+\resultsabstract
+
+\tableofcontents
+\listoffigures
+\listoftables
+
+\chapter{Introduction}
+\section{Motivation}
+Since 2022, interference with GNSS signals has become routine around the Baltic Sea, the Eastern Mediterranean, the Black
+Sea, Iraq and Iran, Myanmar and the India--Pakistan border. Aircraft lose their satellite position, or worse, are fed a
+confident but false one. Air navigation service providers, airlines and regulators need to know where interference happens,
+whether it is jamming or spoofing, and where it comes from.
+\section{Problem statement}
+Given crowdsourced ADS-B broadcasts from all aircraft in a region, (1) detect GNSS interference at the level of individual
+aircraft and 10-minute windows, (2) classify it as jamming or spoofing, and (3) estimate the location of jammers, without
+manually labelled training data.
+\section{Objectives}
+\begin{enumerate}
+\item Build an open, reproducible data pipeline from public ADS-B archives.
+\item Design features that remain informative when the GNSS solution itself is manipulated.
+\item Produce training labels by weak supervision.
+\item Train a deep model that uses both each aircraft's history and its neighbours.
+\item Localize jammers and compare with published classical methods.
+\item Provide an interactive map for inspection.
+\end{enumerate}
+\section{Organisation of the report}
+Chapter~2 gives background on GNSS and ADS-B. Chapter~3 reviews related work. Chapter~4 describes the data and weak
+supervision, Chapter~5 the model, Chapter~6 the simulator, Chapter~7 the implementation, Chapter~8 the results and
+Chapter~9 the challenges met. Chapter~10 concludes.
+
+\chapter{Background}
+\section{GNSS and its vulnerabilities}
+GNSS receivers compute position from signals that arrive at the Earth's surface at around $-160$\,dBW, far below the
+thermal noise floor. A transmitter of a few watts can therefore overwhelm the signal over hundreds of kilometres
+(jamming). A spoofer broadcasts counterfeit signals that the receiver locks onto, producing a wrong position or time.
+\section{ADS-B}
+Automatic Dependent Surveillance--Broadcast (ADS-B) is the system by which aircraft broadcast their GNSS-derived position,
+velocity and identity about twice per second on 1090\,MHz. Messages also carry integrity indicators: the Navigation Integrity
+Category (NIC), Navigation Accuracy Category for position (NAC\textsubscript{p}), Source Integrity Level (SIL) and Geometric
+Vertical Accuracy (GVA). Aircraft also report barometric altitude, which does not depend on GNSS, and geometric (GNSS)
+altitude. Volunteer receiver networks such as adsb.lol and the OpenSky Network collect these broadcasts worldwide.
+Multilateration (MLAT) between ground receivers gives an independent position for aircraft seen by several receivers.
+\section{Why integrity thresholds miss spoofing}
+Under jamming the receiver loses track and NIC falls towards zero. Under spoofing the receiver tracks a consistent but false
+signal and continues to report a high NIC. Detecting spoofing therefore requires checking the reported position against
+information the spoofer does not control.
+\section{Deep learning components}
+We use the Transformer encoder~\cite{vaswani2017attention} for per-aircraft sequences and attention over nearby aircraft
+in the style of graph attention networks~\cite{brody2022gatv2}. Weak supervision follows the data-programming
+approach~\cite{ratner2017snorkel} with a Dawid--Skene label model~\cite{dawid1979}.
+
+\chapter{Literature Review}
+Liu et al.~\cite{liu2022itm,liu2025nls} locate jammers with ADS-B by modelling received power with the Friis equation and
+solving a non-linear least squares problem; on the Denver 2022 event they report about 4\,km error. Sch\"afer et
+al.~\cite{jammerhorizon} use radio horizons to bound the jammer position. gpsjam.org~\cite{gpsjam} publishes daily maps of the
+share of aircraft with low NIC per hexagon. The DLR study~\cite{eichstaedt2026sharc} measures global interference from
+space-based ADS-B, and an industry white paper~\cite{aireon2026spoofing} describes spoofing checks based on integrity and
+position consistency. None of these combine learned jam/spoof classification, cross-aircraft evidence and learned
+localization with weak supervision, which is the gap this project addresses.
+
+\chapter{Data and Weak Supervision}
+\section{Data source and licence}
+The adsb.lol \texttt{globe\_history} archive~\cite{adsblol} publishes one tarball of readsb trace files per day under ODbL-1.0.
+ADS-B Exchange sample data was considered and rejected because its terms limit it to evaluation. \datasetsentence
+\section{Processing}
+Trace points are parsed in parallel and filtered to six interference regions and three comparison regions. Integrity fields,
+which appear only in periodic detail objects, are forward-filled with their age recorded. Points are binned into 30-second steps
+and 10-minute windows.
+\section{Features}
+\todo{Copy and extend Section III-B of the paper; include the wind-estimation fix from Chapter 9.}
+\section{Labeling functions and the label model}
+\input{../paper/tables/lfs.tex}
+\todo{Describe the label model, the all-abstain issue and its fix, and per-region label statistics.}
+
+\chapter{The GIST Model}
+\todo{Extend Section IV of the paper with an architecture diagram and the loss functions.}
+
+\chapter{Interference Simulator}
+\todo{Extend Section V of the paper with the propagation model, antenna pattern and the EIRP calibration.}
+
+\chapter{Implementation}
+\section{Software stack}
+Python 3.12, PyTorch with the Apple MPS backend, Polars and DuckDB for data processing, H3 for spatial indexing, NumPy and
+SciPy for the baselines. All code is in a single repository with tests for propagation and the label model.
+\section{Hardware constraints}
+All experiments ran on an Apple M3 laptop with 8\,GB of memory. This drove several design choices: streaming parse with raw
+data deleted after processing, a 21$\times$21 localization grid with coarse-to-fine refinement instead of a dense grid,
+padding scenes to four fixed sizes to avoid repeated GPU graph compilation, and capping the GPU memory cache.
+
+\chapter{Results}
+\input{../paper/tables/results.tex}
+\input{../paper/tables/ablations.tex}
+\section{Case studies}
+\todo{Insert case-study figures from paper/figures (case\_*.pdf) with discussion.}
+
+\chapter{Challenges and Lessons}
+\begin{itemize}
+\item \textbf{Data licensing.} The first-choice dataset (ADS-B Exchange samples) was evaluation-only; switching to adsb.lol
+(ODbL) kept the work publishable and gave daily rather than monthly coverage.
+\item \textbf{Download throttling.} GitHub throttled release downloads to a few bytes per second after about 7\,GB; the
+downloader was rewritten to resume per part and back off.
+\item \textbf{Noisy wind feature.} A naive wind triangle from forward-filled airspeed and heading was useless (99th percentile
+of several hundred knots in clean regions). Using readsb's own wind estimate only on points with fresh data, excluding
+turns and comparing within altitude bands reduced the median deviation to about 5\,kt.
+\item \textbf{Label-model artifact.} Windows on which every labeling function abstained were assigned to the class with the
+highest abstention rate (spoofing), producing 13\% ``spoofed'' windows over Australia. These windows are now unlabelled.
+\item \textbf{Unrealistic first simulator.} Emitters of 1--100\,W affected 0.4\% of aircraft per scene; raising the power to
+the range estimated in the literature gave realistic affected regions.
+\item \textbf{Memory on an 8\,GB laptop.} The training process grew to 7.6\,GB through the GPU caching allocator, slowing
+epochs by an order of magnitude until the cache was capped.
+\end{itemize}
+
+\chapter{Conclusion and Future Work}
+\todo{Summarise results.} Future work: the Denver 2022 case study with OpenSky data (pending data access), the MLAT-only
+release as an independent position reference, receiver-aware radio-horizon checks, and an online version that updates
+every few minutes.
+
+\bibliographystyle{IEEEtran}
+\bibliography{../paper/related}
+
+\appendix
+\chapter{Reproducing the results}
+See \texttt{README.md}: fetch days, build labels, build scene datasets, train, evaluate, generate tables and figures.
+\end{document}

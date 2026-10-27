@@ -83,24 +83,39 @@ def case_study(run: Path, day: str, region: str, out: Path) -> None:
         nic_low=(pl.col("nic_low_frac").fill_null(0) >= 0.3).cast(pl.Float64),
     )
     box = REGIONS[region]
-    fig, axes = plt.subplots(1, 3, figsize=(7.2, 2.6))
+    fig, axes = plt.subplots(1, 3, figsize=(7.2, 3.1), layout="constrained")
     for ax, (col, title, cmap) in zip(axes, (("nic_low", "Baseline: share NIC ≤ 6", "Greys"),
                                              ("p_jam", "GIST: P(jammed)", "Oranges"),
                                              ("p_spoof", "GIST: P(spoofed)", "Purples"))):
         draw_land(ax, box)
         pc = hex_layer(ax, df, col, cmap)
         ax.set_title(title)
-        fig.colorbar(pc, ax=ax, fraction=0.04, pad=0.02)
+        fig.colorbar(pc, ax=ax, orientation="horizontal", fraction=0.05, pad=0.02, aspect=30)
     em_file = run / f"emitters_{day}.parquet"
     if em_file.exists():
         em = pl.read_parquet(em_file).filter(pl.col("region") == region)
         if em.height:
-            axes[1].scatter(em["lon"], em["lat"], s=10, marker="x", c="#7a1f00", linewidths=0.8, zorder=3, label="jammer estimates")
-            axes[1].legend(loc="lower left", fontsize=6, frameon=False)
-    fig.suptitle(f"{region} · {day} · all 10-min windows", fontsize=9)
+            axes[1].scatter(em["lon"], em["lat"], s=6, c="#7a1f00", alpha=0.35, linewidths=0, zorder=3,
+                            label=f"jammer estimates (n={em.height})")
+    for ev in reference_sources(region):
+        axes[1].scatter([ev["lon"]], [ev["lat"]], s=60, marker="*", c="#a3206f", edgecolors="white", linewidths=0.5,
+                        zorder=4, label=f"reported source: {ev['id']} (±{ev['unc']} km)")
+    if axes[1].get_legend_handles_labels()[0]:
+        axes[1].legend(loc="upper left", fontsize=5.5, frameon=True, framealpha=0.85)
+    fig.suptitle(f"{region} · {day} · all scored 10-min windows", fontsize=9)
     fig.savefig(out / f"case_{region}_{day}.pdf")
     fig.savefig(out / f"case_{region}_{day}.png")
     plt.close(fig)
+
+
+def reference_sources(region: str) -> list[dict]:
+    """Region-level reported interference sources from labels/events.yaml (approximate)."""
+    import yaml
+
+    events = yaml.safe_load(Path("src/gist/labels/events.yaml").read_text())["anchors"]
+    return [{"id": e["id"], "lat": e["approx_source"]["lat"], "lon": e["approx_source"]["lon"],
+             "unc": e["approx_source"]["uncertainty_km"]}
+            for e in events if e["region"] == region and e.get("approx_source")]
 
 
 def loc_cdf(errors: dict[str, list[float]], out: Path, name: str) -> None:

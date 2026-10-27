@@ -28,6 +28,9 @@ os.environ.setdefault("PYTORCH_MPS_HIGH_WATERMARK_RATIO", "0.6")
 os.environ.setdefault("PYTORCH_MPS_LOW_WATERMARK_RATIO", "0.5")
 
 CLASS_W = torch.tensor([1.0, 2.0, 4.0])
+# "Integrity fields only" ablation: NIC/NACp/SIL/GVA/version, barometric altitude, NIC-missing flag —
+# what an integrity-threshold monitor sees.
+INTEGRITY_FEATURES = [0, 1, 2, 3, 4, 5, 6, 18]
 LOC_SIGMA_KM = 40.0
 
 
@@ -139,10 +142,14 @@ def main() -> None:
     tr = DataLoader(SceneDataset(a.train, kinds), batch_size=a.batch, shuffle=True, collate_fn=collate, num_workers=0)
     va = DataLoader(SceneDataset(a.val), batch_size=a.batch, shuffle=False, collate_fn=collate)
     model = GIST(F, use_graph=not a.no_graph, use_physics=not a.no_physics_loc, use_learned_loc=not a.no_learned_loc).to(dev)
+    if a.integrity_only:
+        keep = torch.zeros(F, device=dev)
+        keep[INTEGRITY_FEATURES] = 1.0
+        model.feat_mask.copy_(keep)
     if a.init:
         model.enc.load_state_dict(torch.load(a.init, map_location=dev))
     if a.eval_only:
-        model.load_state_dict(torch.load(a.eval_only, map_location=dev))
+        model.load_state_dict(torch.load(a.eval_only, map_location=dev), strict=False)
         res = evaluate(model, va, dev)
         errs = res.pop("loc_errors", {})
         print(json.dumps(res, indent=2))
@@ -156,15 +163,10 @@ def main() -> None:
     run.mkdir(parents=True, exist_ok=True)
     (run / "args.json").write_text(json.dumps(vars(a), indent=2))
     best, history = -1.0, []
-    integrity_cols = torch.tensor([0, 1, 2, 3, 4, 5], device=dev)
     for ep in range(a.epochs):
         t0, agg = time.time(), np.zeros(3)
         for b in tr:
             b = to_dev(b, dev)
-            if a.integrity_only:
-                keep = torch.zeros(F, device=dev, dtype=torch.bool)
-                keep[integrity_cols] = True
-                b["x"] = b["x"] * keep
             out = model(b)
             l_node, l_step, l_loc = losses(model, out, b)
             loss = l_node + l_step + 0.5 * l_loc

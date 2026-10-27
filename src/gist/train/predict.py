@@ -90,12 +90,14 @@ def main() -> None:
     a = ap.parse_args()
     dev = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
     model = GIST(F).to(dev)
-    model.load_state_dict(torch.load(a.ckpt, map_location=dev))
+    model.load_state_dict(torch.load(a.ckpt, map_location=dev), strict=False)
     model.eval()
     run = Path(a.ckpt).parent
     for day in a.days:
-        wins = list(range(0, 144, a.every))
-        pred, em = predict_day(model, day, a.regions, dev, wins)
+        # Window ids are absolute (unix_time // 600); subsample the day's own windows.
+        all_wins = (pl.scan_parquet(f"data_store/steps/{day}.parquet").select((pl.col("step") // WIN_STEPS).unique().sort())
+                    .collect().to_series().to_list())
+        pred, em = predict_day(model, day, a.regions, dev, all_wins[:: a.every])
         pred.write_parquet(run / f"pred_{day}.parquet")
         if em.height:
             em.write_parquet(run / f"emitters_{day}.parquet")

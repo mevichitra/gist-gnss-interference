@@ -126,4 +126,4 @@ def build_scene(steps: pl.DataFrame, labels: pl.DataFrame | None, lat0: float, l
     if emitter is not None:
         ex0, ny0 = to_km(np.array(emitter["lat"]), np.array(emitter["lon"]), lat0, lon0)
         em[:] = [float(ex0), float(ny0), 1 if emitter["kind"] == "jam" else 2, 1]
-    return Scene(x, mask, pos, h, xy_node.astype(np.float32), y_soft, y_step, em, meta or {})
+    return Scene(x, mask, pos, h, xy_node.astype(np.float32), y_soft, y_step, em, {**(meta or {}), "hexes": hexes})

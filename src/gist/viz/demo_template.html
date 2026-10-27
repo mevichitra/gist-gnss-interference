@@ -1,0 +1,236 @@
+<title>GIST Interference Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: chart-style map on the left, readout panel on the right, hour scrubber under the map; stacks on phones. */
+:root {
+  --sea: #e4eff3; --land: #efe9da; --coast: #a39a83; --ink: #1d2a33; --muted: #5b6b75;
+  --panel: #fbfcfd; --line: #d4dee3; --accent: #a3206f; --jam: #d9541e; --spoof: #6b3fb3; --base: #4a5560;
+  --chip: #eef3f6;
+  --f-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-data: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --sea: #0f1d29; --land: #22303b; --coast: #4b5b66; --ink: #e4ebef; --muted: #9aabb6;
+  --panel: #13222e; --line: #2a3b48; --accent: #e25aa8; --jam: #ff7a3d; --spoof: #a684ee; --base: #b8c4cc;
+  --chip: #1b2c39; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --sea: #0f1d29; --land: #22303b; --coast: #4b5b66; --ink: #e4ebef; --muted: #9aabb6;
+  --panel: #13222e; --line: #2a3b48; --accent: #e25aa8; --jam: #ff7a3d; --spoof: #a684ee; --base: #b8c4cc;
+  --chip: #1b2c39; color-scheme: dark }
+* { box-sizing: border-box }
+body { background: var(--panel); color: var(--ink); font: 14px/1.5 var(--f-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 14px 24px }
+header { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 24px; border-bottom: 2px solid var(--accent); padding-bottom: 10px }
+h1 { font: 700 26px/1 var(--f-display); letter-spacing: .01em; margin: 0; text-wrap: balance }
+h1 small { display: block; font: 500 13px/1.3 var(--f-body); color: var(--muted); margin-top: 4px; letter-spacing: 0 }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; margin-left: auto }
+label.ctl { display: grid; gap: 2px; font: 600 11px var(--f-display); text-transform: uppercase; letter-spacing: .08em; color: var(--muted) }
+select, .seg button { font: 500 13px var(--f-body); color: var(--ink); background: var(--chip); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden }
+.seg button { border: 0; border-radius: 0; cursor: pointer; padding: 6px 10px }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--panel) }
+.seg button:focus-visible, select:focus-visible, .hours button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+main { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; margin-top: 14px }
+@media (max-width: 860px) { main { grid-template-columns: 1fr } }
+.mapwrap { position: relative; min-width: 0 }
+svg#map { width: 100%; height: auto; display: block; background: var(--sea); border: 1px solid var(--line); border-radius: 4px }
+.land { fill: var(--land); stroke: var(--coast); stroke-width: .6 }
+.grat { fill: none; stroke: var(--coast); stroke-opacity: .25; stroke-width: .5; stroke-dasharray: 2 3 }
+.gratlbl { font: 9px var(--f-data); fill: var(--muted) }
+.cell { stroke: none }
+.cell:hover { stroke: var(--ink); stroke-width: 1 }
+.em { stroke: var(--accent); stroke-width: 2; fill: none }
+.tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px;
+  font: 12px/1.45 var(--f-data); box-shadow: 0 4px 14px rgb(0 0 0 / .12); min-width: 190px }
+.hours { margin-top: 10px }
+.hours .row { display: grid; grid-template-columns: repeat(25, minmax(0, 1fr)); gap: 2px; align-items: end; height: 54px }
+.hours button { all: unset; cursor: pointer; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; border-radius: 2px; background: var(--chip) }
+.hours button[aria-pressed="true"] { outline: 2px solid var(--accent) }
+.hours .bar-j { background: var(--jam) } .hours .bar-s { background: var(--spoof) }
+.hours .ticks { display: grid; grid-template-columns: repeat(25, minmax(0, 1fr)); font: 9px var(--f-data); color: var(--muted); margin-top: 3px }
+aside { display: grid; gap: 16px; align-content: start; min-width: 0 }
+aside h2 { font: 600 12px var(--f-display); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px }
+.stat { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-variant-numeric: tabular-nums }
+.stat dt { color: var(--muted) } .stat dd { margin: 0; font: 500 13px var(--f-data); text-align: right }
+.legend { display: grid; gap: 4px }
+.ramp { height: 10px; border-radius: 2px }
+.legend .lbls { display: flex; justify-content: space-between; font: 10px var(--f-data); color: var(--muted) }
+.note { color: var(--muted); font-size: 12.5px; line-height: 1.55; max-width: 65ch }
+.note b { color: var(--ink); font-weight: 600 }
+.pill { display: inline-block; font: 600 10px var(--f-display); letter-spacing: .08em; text-transform: uppercase; padding: 2px 6px; border-radius: 999px; background: var(--chip); color: var(--muted); border: 1px solid var(--line) }
+@media (prefers-reduced-motion: no-preference) { .cell { transition: fill .25s } }
+</style>
+
+<header>
+  <h1>GIST Interference Map<small>GNSS jamming and spoofing seen through aircraft ADS-B, 10-minute resolution</small></h1>
+  <div class="controls">
+    <label class="ctl">Day<select id="day"></select></label>
+    <label class="ctl">Region<select id="region"></select></label>
+    <div class="ctl" role="group" aria-label="Layer"><span style="font:600 11px var(--f-display);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Layer</span>
+      <div class="seg" id="layer">
+        <button data-k="jam" aria-pressed="true">GIST jamming</button><button data-k="spoof" aria-pressed="false">GIST spoofing</button><button data-k="nic" aria-pressed="false">NIC baseline</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="mapwrap">
+    <svg id="map" viewBox="0 0 900 600" role="img" aria-label="Interference map"></svg>
+    <div class="tip" id="tip" hidden></div>
+    <div class="hours" aria-label="Hour of day (UTC)">
+      <div class="row" id="hours"></div>
+      <div class="ticks" id="ticks"></div>
+    </div>
+  </div>
+  <aside>
+    <section>
+      <h2>Readout <span class="pill" id="split"></span></h2>
+      <dl class="stat" id="stats"></dl>
+    </section>
+    <section class="legend">
+      <h2>Legend</h2>
+      <div class="ramp" id="ramp"></div>
+      <div class="lbls"><span>0</span><span id="rampmax">mean probability</span><span>1</span></div>
+      <div class="note"><svg width="14" height="14" viewBox="0 0 14 14" style="vertical-align:-2px"><path class="em" d="M2 2L12 12M12 2L2 12"/></svg> estimated jammer position for a 10-minute scene with strong jamming evidence</div>
+    </section>
+    <section class="note" id="explain"></section>
+  </aside>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script>
+const DATA = /*__DEMO_DATA__*/null;
+const NAMES = { BAL: "Baltic Sea", EMED: "Eastern Mediterranean", BLK: "Black Sea", MEA: "Iraq · Iran · Gulf", INPK: "India–Pakistan border", MYN: "Myanmar" };
+const SPLIT = d => d < "2025-07-01" ? "training day" : d < "2026-01-01" ? "validation day" : "held-out test day";
+const state = { day: null, region: "BAL", layer: "jam", hour: null };
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+const daySel = document.getElementById("day"), regSel = document.getElementById("region");
+Object.keys(DATA.days).sort().forEach(d => daySel.add(new Option(`${d} · ${SPLIT(d)}`, d)));
+Object.keys(NAMES).forEach(r => regSel.add(new Option(NAMES[r], r)));
+state.day = Object.keys(DATA.days).sort().at(-1);
+daySel.value = state.day; regSel.value = state.region;
+daySel.onchange = () => { state.day = daySel.value; state.hour = null; render(); };
+regSel.onchange = () => { state.region = regSel.value; state.hour = null; render(); };
+document.querySelectorAll("#layer button").forEach(b => b.onclick = () => {
+  state.layer = b.dataset.k;
+  document.querySelectorAll("#layer button").forEach(x => x.setAttribute("aria-pressed", x === b));
+  render();
+});
+
+const svg = d3.select("#map"), W = 900, H = 600;
+const gLand = svg.append("g"), gGrat = svg.append("g"), gCells = svg.append("g"), gEm = svg.append("g");
+const tip = document.getElementById("tip");
+
+function scale() {
+  const c = state.layer === "jam" ? css("--jam") : state.layer === "spoof" ? css("--spoof") : css("--base");
+  return d3.scaleSequential(d3.interpolateRgb(css("--sea"), c)).domain([0, 1]).clamp(true);
+}
+
+function rowsFor() {
+  const day = DATA.days[state.day];
+  return day.rows.filter(r => r[0] === state.region && (state.hour === null || r[2] === state.hour));
+}
+
+function aggregate(rows) {
+  const m = new Map();
+  for (const [, cell, , n, jam, spoof, nic] of rows) {
+    const a = m.get(cell) || { n: 0, jam: 0, spoof: 0, nic: 0 };
+    a.n += n; a.jam += jam * n; a.spoof += spoof * n; a.nic += nic * n; m.set(cell, a);
+  }
+  for (const a of m.values()) { a.jam /= a.n; a.spoof /= a.n; a.nic /= a.n; }
+  return m;
+}
+
+function render() {
+  const [la0, la1, lo0, lo1] = DATA.regions[state.region];
+  const box = { type: "Polygon", coordinates: [[[lo0, la0], [lo1, la0], [lo1, la1], [lo0, la1], [lo0, la0]]] };
+  const proj = d3.geoMercator().fitExtent([[10, 10], [W - 10, H - 10]], box);
+  const path = d3.geoPath(proj);
+  const land = DATA.land[state.region].map(r => ({ type: "Polygon", coordinates: [[...r, r[0]]] }));
+  gLand.selectAll("path").data(land).join("path").attr("class", "land").attr("d", path);
+  const grat = d3.geoGraticule().extent([[lo0 - 2, la0 - 2], [lo1 + 2, la1 + 2]]).step([2, 2]);
+  gGrat.selectAll("path").data([grat()]).join("path").attr("class", "grat").attr("d", path);
+  const labels = d3.range(Math.ceil(lo0 / 2) * 2, lo1, 2).map(x => ({ t: `${x}°E`, p: proj([x, la0]) }))
+    .concat(d3.range(Math.ceil(la0 / 2) * 2, la1, 2).map(y => ({ t: `${y}°N`, p: proj([lo0, y]) })));
+  gGrat.selectAll("text").data(labels).join("text").attr("class", "gratlbl").attr("x", d => d.p[0] + 3).attr("y", d => d.p[1] - 3).text(d => d.t);
+
+  const day = DATA.days[state.day];
+  const agg = aggregate(rowsFor());
+  const k = state.layer === "nic" ? "nic" : state.layer;
+  const sc = scale();
+  const cells = [...agg.entries()].map(([id, a]) => ({ id, a, g: { type: "Polygon", coordinates: [[...day.cells[id], day.cells[id][0]].reverse()] } }));
+  gCells.selectAll("path").data(cells, d => d.id).join("path").attr("class", "cell")
+    .attr("d", d => path(d.g)).attr("fill", d => sc(d.a[k])).attr("fill-opacity", d => 0.35 + 0.65 * Math.min(1, d.a.n / 12))
+    .on("mousemove", (ev, d) => {
+      const r = ev.currentTarget.ownerSVGElement.getBoundingClientRect(), wrap = tip.parentElement.getBoundingClientRect();
+      tip.hidden = false;
+      tip.innerHTML = `<b>H3 cell</b> ${d.id}<br>aircraft-windows ${d.a.n}<br>P(jammed) ${d.a.jam.toFixed(2)}<br>P(spoofed) ${d.a.spoof.toFixed(2)}<br>NIC ≤ 6 share ${d.a.nic.toFixed(2)}`;
+      let x = ev.clientX - wrap.left + 12, y = ev.clientY - wrap.top + 12;
+      if (x + 210 > wrap.width) x -= 230;
+      tip.style.left = x + "px"; tip.style.top = y + "px";
+    })
+    .on("mouseleave", () => { tip.hidden = true; });
+
+  const ems = day.emitters.filter(e => e[0] === state.region && (state.hour === null || e[1] === state.hour) && state.layer === "jam");
+  gEm.selectAll("path").data(ems).join("path").attr("class", "em").attr("d", e => {
+    const [x, y] = proj([e[3], e[2]]); return `M${x - 5},${y - 5}L${x + 5},${y + 5}M${x + 5},${y - 5}L${x - 5},${y + 5}`;
+  });
+
+  renderHours(day);
+  renderStats(day, agg, ems.length);
+  document.getElementById("ramp").style.background = `linear-gradient(90deg, ${sc(0)}, ${sc(0.5)}, ${sc(1)})`;
+  document.getElementById("rampmax").textContent = state.layer === "nic" ? "share of windows with NIC ≤ 6" : `mean P(${state.layer === "jam" ? "jammed" : "spoofed"})`;
+  document.getElementById("split").textContent = SPLIT(state.day);
+}
+
+function renderHours(day) {
+  const per = d3.range(24).map(h => {
+    const rs = day.rows.filter(r => r[0] === state.region && r[2] === h);
+    const n = d3.sum(rs, r => r[3]);
+    return { h, n, jam: n ? d3.sum(rs, r => r[4] * r[3]) / n : 0, spoof: n ? d3.sum(rs, r => r[5] * r[3]) / n : 0 };
+  });
+  const max = Math.max(0.05, d3.max(per, p => p.jam + p.spoof));
+  const row = document.getElementById("hours"); row.innerHTML = "";
+  const all = document.createElement("button");
+  all.setAttribute("aria-pressed", state.hour === null); all.title = "All day";
+  all.innerHTML = `<span style="font:600 9px var(--f-display);text-align:center;color:var(--muted)">ALL</span>`;
+  all.onclick = () => { state.hour = null; render(); };
+  row.append(all);
+  per.forEach(p => {
+    const b = document.createElement("button");
+    b.setAttribute("aria-pressed", state.hour === p.h);
+    b.title = `${String(p.h).padStart(2, "0")}:00 UTC · jam ${p.jam.toFixed(2)} · spoof ${p.spoof.toFixed(2)} · ${p.n} windows`;
+    b.innerHTML = `<span class="bar-s" style="height:${(p.spoof / max) * 100}%"></span><span class="bar-j" style="height:${(p.jam / max) * 100}%"></span>`;
+    b.onclick = () => { state.hour = p.h; render(); };
+    row.append(b);
+  });
+  document.getElementById("ticks").innerHTML = "<span></span>" + d3.range(24).map(h => `<span>${h % 6 === 0 ? String(h).padStart(2, "0") : ""}</span>`).join("");
+}
+
+function renderStats(day, agg, nEm) {
+  const s = day.summary.find(x => x.region === state.region) || { n: 0, jam: 0, spoof: 0, nic_low: 0 };
+  const pct = v => (100 * v).toFixed(1) + " %";
+  const hr = state.hour === null ? "all day" : `${String(state.hour).padStart(2, "0")}:00–${String(state.hour).padStart(2, "0")}:59 UTC`;
+  document.getElementById("stats").innerHTML = `
+    <dt>Region</dt><dd>${state.region}</dd>
+    <dt>Window</dt><dd>${hr}</dd>
+    <dt>Aircraft-windows (day)</dt><dd>${s.n.toLocaleString()}</dd>
+    <dt>Classified jammed</dt><dd style="color:var(--jam)">${pct(s.jam)}</dd>
+    <dt>Classified spoofed</dt><dd style="color:var(--spoof)">${pct(s.spoof)}</dd>
+    <dt>NIC ≤ 6 baseline</dt><dd>${pct(s.nic_low)}</dd>
+    <dt>Cells shown</dt><dd>${agg.size}</dd>
+    <dt>Jammer estimates</dt><dd>${state.layer === "jam" ? nEm : "–"}</dd>`;
+  document.getElementById("explain").innerHTML = `
+    <b>How to read this.</b> Each hexagon (~22 km) averages GIST's per-aircraft probabilities over the 10-minute windows in the selected hour.
+    The <b>NIC baseline</b> layer is what an integrity-threshold monitor sees: it lights up under jamming but stays dark under spoofing,
+    because spoofed receivers report good integrity. GIST separates the two using barometric vs GNSS altitude, neighbour wind consensus,
+    position jumps and co-located aircraft. Data: adsb.lol (ODbL). Labels are weakly supervised, not ground truth.`;
+}
+
+render();
+</script>

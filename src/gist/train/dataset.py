@@ -34,7 +34,7 @@ def split_of(day: str) -> str:
 
 def _save(scene: Scene, path: Path) -> None:
     d = asdict(scene)
-    meta = d.pop("meta")
+    meta = {k: v for k, v in d.pop("meta").items() if k != "hexes"}
     np.savez_compressed(path, **{k: (v.astype(np.float16) if v.dtype == np.float32 and k == "x" else v) for k, v in d.items()},
                         meta=np.array(str(meta)))
 
@@ -66,14 +66,15 @@ def real_scenes(day: str, n: int, out: Path, rng: np.random.Generator, interesti
     return made
 
 
-def sim_scenes(day: str, n: int, out: Path, rng: np.random.Generator) -> int:
+def sim_scenes(day: str, n: int, out: Path, rng: np.random.Generator, distractor_frac: float = 0.0,
+               kind: str | None = None) -> int:
     steps = pl.read_parquet(f"data_store/steps/{day}.parquet")
     wins = pl.read_parquet(f"data_store/windows/{day}.parquet")
     made = 0
-    for _ in range(n * 4):
+    for _ in range(n * (12 if kind else 4)):
         if made >= n:
             break
-        got = make_scene(steps, wins, rng)
+        got = make_scene(steps, wins, rng, distractor_frac=distractor_frac, kind=kind)
         if got is None:
             continue
         sim, em = got
@@ -127,14 +128,16 @@ def main() -> None:
     ap.add_argument("--sim", type=int, default=200)
     ap.add_argument("--split", default=None, help="override day-based split (dev runs only)")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--distractors", type=float, default=0.0, help="benign low-NIC aircraft fraction (sim only)")
+    ap.add_argument("--kind", default=None, help="only this emitter kind (jam|spoof) for sim scenes")
     a = ap.parse_args()
     for day in a.days:
         split = a.split or split_of(day)
         out = ROOT / split
         out.mkdir(parents=True, exist_ok=True)
         rng = np.random.default_rng(int(day.replace("-", "")) * 100 + a.seed)
-        r = real_scenes(day, a.real, out, rng)
-        s = sim_scenes(day, a.sim, out, rng)
+        r = real_scenes(day, a.real, out, rng) if a.real else 0
+        s = sim_scenes(day, a.sim, out, rng, a.distractors, a.kind)
         print(day, split, "real", r, "sim", s, flush=True)
 
 

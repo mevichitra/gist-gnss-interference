@@ -102,6 +102,7 @@ def evaluate(model, loader, dev) -> dict:
         res["loc"] = {"n": len(loc_err), "median_km": float(np.median(loc_err)), "p95_km": float(np.percentile(loc_err, 95))}
         res["loc_refined"] = {"n": len(loc_err_ref), "median_km": float(np.median(loc_err_ref)),
                               "p95_km": float(np.percentile(loc_err_ref, 95))}
+        res["loc_errors"] = {"GIST": loc_err_ref, "GIST (learned head only)": loc_err}
     model.train()
     release_memory()
     return res
@@ -143,8 +144,10 @@ def main() -> None:
     if a.eval_only:
         model.load_state_dict(torch.load(a.eval_only, map_location=dev))
         res = evaluate(model, va, dev)
+        errs = res.pop("loc_errors", {})
         print(json.dumps(res, indent=2))
         Path(a.eval_only).with_name(f"eval_{a.val}.json").write_text(json.dumps(res, indent=2))
+        Path(a.eval_only).with_name(f"locerr_{a.val}.json").write_text(json.dumps(errs))
         return
     opt = torch.optim.AdamW(model.parameters(), lr=a.lr, weight_decay=1e-2)
     steps_total = a.epochs * len(tr)
@@ -175,12 +178,13 @@ def main() -> None:
         release_memory()
         res = evaluate(model, va, dev)
         score = np.mean([res[k]["macro_f1"] for k in ("real", "sim") if k in res])
-        history.append({"epoch": ep, "loss": (agg / len(tr)).tolist(), "val": res, "time_s": time.time() - t0})
+        slim = {k: v for k, v in res.items() if k != "loc_errors"}
+        history.append({"epoch": ep, "loss": (agg / len(tr)).tolist(), "val": slim, "time_s": time.time() - t0})
         print(json.dumps(history[-1]), flush=True)
         if score > best:
             best = score
             torch.save(model.state_dict(), run / "best.pt")
-            (run / "best_val.json").write_text(json.dumps(res, indent=2))
+            (run / "best_val.json").write_text(json.dumps(slim, indent=2))
     (run / "history.json").write_text(json.dumps(history, indent=2))
 
 

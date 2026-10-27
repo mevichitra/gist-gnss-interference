@@ -44,13 +44,16 @@ def main() -> None:
     ap.add_argument("--train", default="train")
     ap.add_argument("--test", default="test")
     ap.add_argument("--out", required=True)
+    ap.add_argument("--loc-only", action="store_true")
     a = ap.parse_args()
-    tr = [SceneDataset(a.train)[i] for i in range(len(SceneDataset(a.train)))]
     te_ds = SceneDataset(a.test)
     te = [te_ds[i] for i in range(len(te_ds))]
-    models = {"iforest": IForestBaseline().fit(tr), "lstm_ae": LSTMAEBaseline().fit(tr)}
     results: dict = {}
-    for name in ("gpsjam", "iforest", "lstm_ae"):
+    detectors = () if a.loc_only else ("gpsjam", "iforest", "lstm_ae")
+    if detectors:
+        tr = [SceneDataset(a.train)[i] for i in range(len(SceneDataset(a.train)))]
+        models = {"iforest": IForestBaseline().fit(tr), "lstm_ae": LSTMAEBaseline().fit(tr)}
+    for name in detectors:
         per_kind = {"real": ([], []), "sim": ([], [])}
         for s in te:
             n = s["x"].shape[0]
@@ -82,6 +85,7 @@ def main() -> None:
                      ("nls", lambda: nls(lat, lon, h, aff)[:2])):
             la, lo = f()
             loc[k].append(float(np.hypot(la * KM_PER_DEG - em[1], lo * KM_PER_DEG - em[0])))
+    results["localization_errors"] = {k: v for k, v in loc.items() if v}
     results["localization"] = {k: {"n": len(v), "median_km": float(np.median(v)), "p95_km": float(np.percentile(v, 95))}
                                for k, v in loc.items() if v}
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)

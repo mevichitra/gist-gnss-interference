@@ -36,16 +36,41 @@ def clean_scene(steps: pl.DataFrame, windows: pl.DataFrame, rng: np.random.Gener
     return scene, lat0, lon0
 
 
-def make_scene(steps, windows, rng) -> tuple[pl.DataFrame, Emitter] | None:
+def make_scene(steps, windows, rng, distractor_frac: float = 0.0, kind: str | None = None) -> tuple[pl.DataFrame, Emitter] | None:
     got = clean_scene(steps, windows, rng)
     if got is None:
         return None
     scene, lat0, lon0 = got
     em = sample_emitter(rng, lat0, lon0)
+    if kind is not None and em.kind != kind:
+        return None
     sim = inject(scene, em, rng)
     if (sim["truth"] > 0).sum() == 0:
         return None   # emitter too weak / out of view: no supervision signal
+    if distractor_frac > 0:
+        sim = add_distractors(sim, distractor_frac, rng)
     return sim, em
+
+
+def add_distractors(sim: pl.DataFrame, frac: float, rng: np.random.Generator) -> pl.DataFrame:
+    """Benign low-integrity aircraft (old / poor installations): NIC 3–6 for the whole window,
+    otherwise normal. Truth stays 0. Real airspace has ~2–5 % such aircraft (CUS/CEU, LOG Phase 2)."""
+    from gist.features.physics import neighbor_features, spoof_clusters
+    from gist.sim.inject import DERIVED
+
+    clean = sim.group_by("hex").agg(t=pl.col("truth").max()).filter(pl.col("t") == 0)["hex"].to_list()
+    k = max(1, int(frac * sim["hex"].n_unique()))
+    pick = set(rng.choice(clean, min(k, len(clean)), replace=False).tolist()) if clean else set()
+    nic = {h: int(rng.integers(3, 7)) for h in pick}
+    is_d = pl.col("hex").is_in(list(pick))
+    nic_col = pl.col("hex").replace_strict(nic, default=None, return_dtype=pl.Int8)
+    out = sim.with_columns(
+        nic_min=pl.when(is_d).then(nic_col).otherwise(pl.col("nic_min")),
+        nic_max=pl.when(is_d).then(nic_col).otherwise(pl.col("nic_max")),
+        distractor=is_d,
+    )
+    out = neighbor_features(out.drop([c for c in DERIVED if c in out.columns]))
+    return spoof_clusters(out)
 
 
 def generate(day: str, n: int, out_dir: Path, seed: int = 0) -> int:

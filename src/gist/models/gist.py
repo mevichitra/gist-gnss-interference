@@ -124,6 +124,47 @@ class PhysicsLocalizer(nn.Module):
     def soft_argmax(self, logits):
         return (logits.softmax(-1).unsqueeze(-1) * self.grid).sum(1)
 
+    def physics_ll(self, step_p, pos_km, h_m, mask, cells, stride: int = 2):
+        """Physics log-likelihood (max over EIRP) of candidate cells [B, G, 2] km → [B, G]."""
+        p = step_p[:, :, ::stride].clamp(1e-4, 1 - 1e-4)
+        w = mask[:, :, ::stride].float()
+        pos = pos_km[:, :, ::stride]
+        h = h_m[:, :, ::stride]
+        dist_m = (pos.unsqueeze(1) - cells[:, :, None, None, :]).norm(dim=-1) * 1000.0
+        tx = torch.tensor(10.0, device=dist_m.device)
+        temp = self.log_temp.exp()
+        lls = []
+        for e in torch.linspace(15.0, 55.0, 9, device=dist_m.device):
+            pr = P.received_power_dbw(e, dist_m, tx, h.unsqueeze(1))
+            pr = torch.where(dist_m <= P.radio_horizon_m(h.unsqueeze(1), tx), pr, pr - 40.0)
+            z = (pr - (P.JAM_TOLERANCE_DBW + self.tau_off)) / temp
+            lls.append((w.unsqueeze(1) * (p.unsqueeze(1) * Fn.logsigmoid(z) + (1 - p.unsqueeze(1)) * Fn.logsigmoid(-z))).sum((-1, -2)))
+        return torch.stack(lls, -1).max(-1).values
+
+    def refine(self, logits, step_p, pos_km, h_m, mask, stages=((60.0, 25), (10.0, 21))):
+        """Physics-guided coarse-to-fine localization → [B, 2] km.
+
+        Start: argmax over a 20 km full-scene grid of (normalised physics log-likelihood +
+        learned logits). Then each stage searches a (2·half)² window of n×n cells around the
+        previous estimate with a sharp soft-argmax (ends at 1 km cells). On dev scenes this beat
+        starting from the learned peak alone (p95 173 vs 179 km; medians ~22 km either way).
+        """
+        lin = torch.linspace(-GRID_HALF_KM, GRID_HALF_KM, 2 * GRID_N - 1, device=logits.device)
+        gy, gx = torch.meshgrid(lin, lin, indexing="ij")
+        full = torch.stack([gx.flatten(), gy.flatten()], -1)
+        ll = self.physics_ll(step_p, pos_km, h_m, mask, full.expand(logits.shape[0], -1, -1))
+        nearest = (full[:, None, :] - self.grid[None]).norm(dim=-1).argmin(-1)
+        score = ll / (1 + mask.sum((1, 2)).float().sqrt()).unsqueeze(-1) + logits[:, nearest]
+        centre = full[score.argmax(-1)]
+        for half_km, n in stages:
+            lin = torch.linspace(-half_km, half_km, n, device=logits.device)
+            gy, gx = torch.meshgrid(lin, lin, indexing="ij")
+            cells = centre[:, None, :] + torch.stack([gx.flatten(), gy.flatten()], -1)[None]
+            ll = self.physics_ll(step_p, pos_km, h_m, mask, cells)
+            wts = (ll - ll.max(-1, keepdim=True).values).exp()
+            centre = (wts.unsqueeze(-1) * cells).sum(1) / wts.sum(-1, keepdim=True)
+        return centre
+
 
 class GIST(nn.Module):
     def __init__(self, f_in: int, d: int = 96, enc_layers: int = 3, graph_layers: int = 3,
@@ -153,4 +194,5 @@ class GIST(nn.Module):
         if localize:
             step_p = step_logits.softmax(-1)[..., 1] * mask
             out["loc_logits"] = self.loc(step_p, batch["pos_km"], batch["h_m"], mask, z, batch["xy_node"], node_mask)
+            out["step_p"] = step_p
         return out

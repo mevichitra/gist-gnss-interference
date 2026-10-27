@@ -40,3 +40,11 @@
 - **Label-model bug:** windows where all LFs abstain got the Dawid–Skene posterior of the all-abstain pattern, which favours SPOOFED (highest abstention class) → 12.8 % "spoofed" in AUS on 2026-01-01. Fix: uncovered windows are unlabelled (label −1, NaN probs). After fix, controls ≥ 99.6 % normal on both days.
 - Download throttling: GitHub release assets dropped to bytes/s after ~7 GB (general bandwidth 25 MB/s). Fetcher backs off up to 10 min per stalled attempt; 1st-of-month days prioritised over 15ths.
 - Localization head memory: 41×41 grid × stride 2 needed 2.3 GB autograd and took 17 min/step under swap. 21×21 grid (40 km cells, soft-argmax refinement), stride 4, ≤ 256 nodes: 0.36 GB, 0.05 s/step.
+
+## 2026-10-27 — Phase 5 dev results (train 2026-10-25 / test 2026-01-01; pipeline check only)
+- Memory leak: training process grew to 7.6 GB (MPS caching allocator) → epochs 18–36 min instead of ~2. Fixed with PYTORCH_MPS_HIGH/LOW_WATERMARK_RATIO=0.6/0.5 + empty_cache per epoch.
+- GIST (15 ep): real macro-F1 0.80, jam AP 0.993, jam R@1%FPR 0.991, spoof AP 0.39, spoof R@1%FPR 0.78 (60 spoof windows only); sim macro-F1 0.99, spoof R@1%FPR 1.00.
+- Baselines on same scenes, spoof R@1%FPR real/sim: gpsjam 0.01/0.01, iForest 0.07/0.01, LSTM-AE 0.03/0.01. Jam AP real: gpsjam 0.85, iForest 0.79, LSTM-AE 0.24.
+- Localization (86 sim jammers): GIST coarse soft-argmax 40.0 km median → physics-guided coarse-to-fine refinement 22.1 km (p95 173); NLS 23.9 (p95 241); centroid 85.5; horizon 102.6.
+- Diagnostics: oracle step labels only reach 17.2 km median → sims are information-limited (tolerance spread, unknown emitter height); searching emitter height hurts with model probabilities (39.6) but helps the oracle tail (p95 98).
+- Planned robustness experiment: keep benign low-NIC aircraft and co-present spoofed aircraft in localization scenes (current clean-scene sampling removes them, which flatters NLS).

@@ -1,0 +1,147 @@
+\documentclass[conference]{IEEEtran}
+\usepackage{amsmath,amssymb,graphicx,booktabs,hyperref,xcolor}
+\newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+\input{tables/macros.tex}
+
+\begin{document}
+\title{GIST: Weakly-Supervised Detection, Classification and Localization of GNSS Jamming and Spoofing from Crowdsourced ADS-B}
+\author{\IEEEauthorblockN{<<AUTHOR>>}\IEEEauthorblockA{<<COLLEGE>>\\<<EMAIL>>}}
+\maketitle
+
+\begin{abstract}
+GNSS interference has become a daily hazard for civil aviation, yet public monitors threshold a single
+integrity field per hexagon per day: they cannot tell jamming from spoofing, react with a delay of a day,
+and do not locate the emitter. We present GIST, which treats every aircraft as a remote GNSS sensor.
+GIST builds physics-consistency features that a spoofer controlling the GNSS solution cannot fake cheaply
+(geometric vs.\ barometric altitude relative to neighbours, readsb wind estimates vs.\ neighbour consensus,
+position jumps under nominal integrity, co-located aircraft at different altitudes), learns per-aircraft
+temporal representations with a Transformer, shares evidence between nearby aircraft with spatial graph
+attention, and localizes jammers with a differentiable Friis/radio-horizon likelihood combined with a learned
+heatmap. Labels come from a generative label model over physics-based labeling functions, so no manual
+annotation is required. On openly licensed ADS-B data (adsb.lol, ODbL) \resultsabstract
+\end{abstract}
+
+\section{Introduction}
+Global Navigation Satellite System (GNSS) interference affecting aviation has grown sharply since 2022
+around the Baltic Sea, the Eastern Mediterranean, the Black Sea, the Middle East and the India--Pakistan
+border. Two very different threats are usually conflated: \emph{jamming}, where the receiver loses the
+signal and the aircraft's broadcast Navigation Integrity Category (NIC) collapses, and \emph{spoofing},
+where a counterfeit signal yields a confident but false position. Because a spoofed receiver typically
+reports \emph{high} integrity, monitors that threshold NIC~\cite{gpsjam} detect jamming well but are
+structurally blind to spoofing.
+
+Every ADS-B equipped aircraft broadcasts its GNSS position, integrity indicators, barometric altitude,
+geometric (GNSS) altitude and velocity. Barometric altitude and air data are independent of GNSS, and a
+spoofer cannot make hundreds of aircraft mutually consistent. We exploit this redundancy.
+
+\textbf{Contributions.} (1) A weakly-supervised, openly licensed dataset of jamming/spoofing labels built
+from physics-based labeling functions and a generative label model. (2) Spoofing-sensitive features that
+do not depend on integrity fields the spoofer controls. (3) GIST, a trajectory Transformer with spatial
+graph attention for 3-way classification. (4) A differentiable localization head trained sim-to-real on
+synthetic emitters injected into real traffic. (5) A minute-level detection latency, versus day-level maps.
+
+\section{Related Work}
+\textbf{Localization from ADS-B.} Liu et al.\ model jamming power with Friis propagation and solve for the
+emitter by non-linear least squares~\cite{liu2022itm,liu2025nls}, reaching $\sim$4\,km on the Denver 2022
+event. Sch\"afer et al.\ intersect radio horizons~\cite{jammerhorizon}. These methods need clean
+affected/unaffected labels and do not address spoofing. \textbf{Detection.} gpsjam.org~\cite{gpsjam}
+publishes a daily NIC-threshold hexagon map; space-based ADS-B has been used for global
+measurement~\cite{eichstaedt2026sharc}, and industry white papers describe NIC/position cross-checks~\cite{aireon2026spoofing}.
+\textbf{Weak supervision.} We follow the data-programming paradigm~\cite{ratner2017snorkel} with a
+Dawid--Skene label model~\cite{dawid1979}.
+
+\section{Data and Weak Supervision}
+\subsection{Data}
+We use the adsb.lol \texttt{globe\_history} archive~\cite{adsblol} (ODbL-1.0): daily dumps of readsb~\cite{readsb}
+trace files containing every received position with source type (ADS-B, ADS-R, MLAT, TIS-B), barometric
+and geometric altitude, ground speed and track, and periodically attached detail objects with NIC,
+NAC\textsubscript{p}, SIL, GVA, true airspeed, heading and readsb's wind estimate. \datasetsentence
+
+Points are binned into 30\,s steps per aircraft and 10-minute windows of 20 steps. Six interference regions
+(BAL, EMED, BLK, MEA, INPK, MYN) and three comparison regions (Central Europe, US Midwest, SE Australia) are
+extracted.
+
+\subsection{Physics-consistency features}
+For every step we compute: integrity minima/maxima; kinematic residual
+$\lvert \lVert \Delta \mathbf{p} \rVert - v_{gs}\,\Delta t \rvert$ between consecutive ADS-B positions;
+ADS-B gaps and stale flags; geometric-minus-barometric altitude relative to the median of trusted aircraft
+($\mathrm{NIC}\ge7$) in the same H3 resolution-3 cell, 5-minute slot and 6000\,ft band; deviation of
+readsb's wind estimate from the same consensus, using only points carrying a fresh detail object and
+excluding turning steps; and a spoof-cluster flag when $\ge3$ aircraft report positions within the same
+$0.005^\circ$ cell within 60\,s while their barometric altitudes span $\ge5000$\,ft.
+
+\subsection{Labeling functions and label model}
+Ten labeling functions (LFs) vote \textsc{normal}, \textsc{jammed}, \textsc{spoofed} or abstain per window
+(Table~\ref{tab:lfs}). LFs never use the region name. A Dawid--Skene model estimates class-conditional LF
+confusion matrices by EM; windows on which every LF abstains are left unlabelled, since the all-abstain
+posterior otherwise favours the class with the highest abstention rate. The MLAT-consistency LF is held
+out of training and used only for evaluation.
+
+\input{tables/lfs.tex}
+
+\section{Method}
+\subsection{Trajectory encoder}
+Each aircraft-window is a sequence of 20 step vectors (23 features incl.\ missingness flags), embedded by
+an MLP, given learned positional embeddings and a [CLS] token, and encoded by a 3-layer pre-norm
+Transformer ($d=96$, 4 heads).
+\subsection{Spatial graph attention}
+Aircraft in a scene ($\pm3^\circ$ latitude, same 10-minute window, $\le256$ aircraft) attend to each other
+within 400\,km. Attention logits receive a learned bias from edge features
+$(\Delta x, \Delta y, d, \Delta h)$ in the spirit of GATv2~\cite{brody2022gatv2}; three layers.
+\subsection{Heads}
+A node head predicts the window class; a step head predicts the per-step class from the step token
+concatenated with the node embedding.
+\subsection{Differentiable localization}
+Given per-step jamming probabilities $p_{it}$ at positions $\mathbf{x}_{it}$ and heights $h_{it}$, the
+physics layer scores each cell $g$ of a $21\times21$ grid (40\,km) and EIRP $e$ by
+\begin{equation}
+\ell(g,e)=\sum_{i,t} p_{it}\log\sigma(z_{it})+(1-p_{it})\log\sigma(-z_{it}),\quad
+z_{it}=\frac{P_r(g,e,\mathbf{x}_{it},h_{it})-\tau}{T},
+\end{equation}
+with $P_r$ from Friis free-space loss at L1, an elevation-dependent antenna gain and a 4/3-Earth radio
+horizon; $\tau=-115\,\mathrm{dBW}$~\cite{liu2022itm} plus a learned offset and $T$ learned. Logits are
+$\mathrm{logsumexp}_e\,\ell(g,e)$ (normalised) plus a learned heatmap from grid-to-aircraft
+cross-attention; the location is the soft-argmax.
+\subsection{Training}
+Real scenes contribute soft node labels from the label model; simulated scenes (Sec.~\ref{sec:sim})
+contribute exact node and step labels and the emitter position. Loss = weighted soft cross-entropy (node)
++ cross-entropy (step) + $0.5\times$(Gaussian-target cross-entropy + L1) (localization).
+
+\section{Simulation}\label{sec:sim}
+Synthetic emitters are injected into clean real traffic at the step-feature level, then neighbour and
+cluster features are recomputed. Jammers (60\%) have EIRP 20--50\,dBW, ground (2--50\,m) or airborne
+(1--10\,km); receiver tolerance $\mathcal{N}(-115, 3^2)$\,dBW; above tolerance NIC$\to$0, geometric
+altitude is lost and positions drop with probability $\sigma(m/3)$; within 6\,dB below, NIC$\in[1,6]$.
+Spoofers (40\%, 10--40\,dBW) capture receivers at margin $>-5$\,dB (sticky) and replace positions with a
+static point, circle or drift, keep NIC$\ge8$, offset geometric altitude and make reported velocity
+consistent with the fake track. \simsentence
+
+\section{Experiments}
+\subsection{Setup}
+Days are split temporally: train up to 2025-06, validation 2025-07 to 2025-12, test 2026-01 to 2026-10.
+\splitsentence
+
+\subsection{Baselines}
+gpsjam-style cell threshold, Isolation Forest and LSTM autoencoder on the same windows; for localization,
+NIC-weighted centroid, radio-horizon scoring and Liu-style NLS (our re-implementation, 2.4\,km median error
+on noise-free simulated ground jammers).
+
+\input{tables/results.tex}
+\input{tables/ablations.tex}
+
+\section{Case Studies}
+\todo{BAL, EMED, INPK maps; KDEN once OpenSky access is granted}
+
+\section{Limitations and Ethics}
+Labels are weak: they encode our physics assumptions, and agreement with them is not ground truth;
+we therefore report results on simulated ground truth and on a held-out independent signal (MLAT).
+Simulation uses free-space propagation with a coarse antenna model. Coverage of crowdsourced receivers is
+uneven (sparse over parts of the Middle East and South Asia). All data are public broadcasts; we publish
+aggregates and events, not per-aircraft tracks. The work is defensive.
+
+\section{Conclusion}
+\todo{after results}
+
+\bibliographystyle{IEEEtran}
+\bibliography{related}
+\end{document}

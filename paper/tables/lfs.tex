@@ -1,0 +1,18 @@
+\begin{table}[t]\centering\small
+\caption{Labeling functions (window = 10 min). ``modern'' = ADS-B version $\ge1$; ``cruise'' = median altitude $>10\,000$\,ft.}
+\label{tab:lfs}
+\begin{tabular}{@{}lll@{}}\toprule
+LF & Vote & Condition \\\midrule
+nic\_zero & JAM & modern, cruise, $\ge30\%$ steps NIC $\le1$ \\
+nic\_drop & JAM & modern, cruise, NIC $\ge8$ seen and $\ge30\%$ steps NIC $\le6$ \\
+pos\_loss & JAM & cruise, ADS-B gap $\ge90$\,s, $\ge10\%$ steps NIC $\le6$ \\
+cell\_jam & JAM & $\ge30\%$ of cell aircraft and $\ge30\%$ own steps NIC $\le6$ \\
+teleport & SPOOF & position jump $>10$\,km with NIC $\ge7$ \\
+gdiff & SPOOF & $\ge2$ steps with $|\Delta h_{geo-baro}-\text{nbr}|>1000$\,ft, NIC $\ge7$ \\
+cluster & SPOOF & member of a co-located, altitude-spread cluster \\
+mlat$^\dagger$ & SPOOF & MLAT vs.\ ADS-B position disagreement $>10$\,km \\
+clean & NORMAL & all NIC $\ge8$, no jump/gdiff/cluster, $\ge10$ steps \\
+clean\_lowcell & NORMAL & modern, cell NIC-low share $<5\%$, own NIC never low \\\bottomrule
+\multicolumn{3}{l}{$^\dagger$held out of training labels; evaluation only.}
+\end{tabular}
+\end{table}

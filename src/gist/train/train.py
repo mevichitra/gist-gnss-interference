@@ -6,7 +6,9 @@
 from __future__ import annotations
 
 import argparse
+import gc
 import json
+import os
 import time
 from pathlib import Path
 
@@ -19,6 +21,11 @@ from torch.utils.data import DataLoader
 from gist.models.gist import GIST
 from gist.train.dataset import SceneDataset, collate
 from gist.train.tensors import F
+
+# Cap the MPS caching allocator (unified memory on an 8 GB Mac): without it the process grew to
+# 7.6 GB over 12 epochs and pushed the machine into swap. Read when MPS first allocates.
+os.environ.setdefault("PYTORCH_MPS_HIGH_WATERMARK_RATIO", "0.6")
+os.environ.setdefault("PYTORCH_MPS_LOW_WATERMARK_RATIO", "0.5")
 
 CLASS_W = torch.tensor([1.0, 2.0, 4.0])
 LOC_SIGMA_KM = 40.0
@@ -60,7 +67,7 @@ def losses(model, out, b):
 def evaluate(model, loader, dev) -> dict:
     model.eval()
     rows = {"real": ([], []), "sim": ([], [])}
-    loc_err = []
+    loc_err, loc_err_ref = [], []
     for b in loader:
         b = to_dev(b, dev)
         out = model(b)
@@ -72,14 +79,17 @@ def evaluate(model, loader, dev) -> dict:
             rows[kind][1].append(p[i][m].cpu().numpy())
             em = b["emitter"][i]
             if em[3] > 0 and em[2] == 1 and "loc_logits" in out:
-                est = model.loc.soft_argmax(out["loc_logits"][i : i + 1])[0]
+                sl = slice(i, i + 1)
+                est = model.loc.soft_argmax(out["loc_logits"][sl])[0]
                 loc_err.append(float((est - em[:2]).norm()))
+                ref = model.loc.refine(out["loc_logits"][sl], out["step_p"][sl], b["pos_km"][sl], b["h_m"][sl], b["mask"][sl])[0]
+                loc_err_ref.append(float((ref - em[:2]).norm()))
     res = {}
     for kind, (ys, ps) in rows.items():
         if not ys:
             continue
         y, p = np.concatenate(ys), np.concatenate(ps)
-        r = {"n": int(len(y)), "macro_f1": float(f1_score(y, p.argmax(1), average="macro", labels=[0, 1, 2], zero_division=0))}
+        r = {"n": len(y), "macro_f1": float(f1_score(y, p.argmax(1), average="macro", labels=[0, 1, 2], zero_division=0))}
         for c, name in ((1, "jam"), (2, "spoof")):
             pos = y == c
             if pos.sum() and (~pos).sum():
@@ -90,8 +100,17 @@ def evaluate(model, loader, dev) -> dict:
         res[kind] = r
     if loc_err:
         res["loc"] = {"n": len(loc_err), "median_km": float(np.median(loc_err)), "p95_km": float(np.percentile(loc_err, 95))}
+        res["loc_refined"] = {"n": len(loc_err_ref), "median_km": float(np.median(loc_err_ref)),
+                              "p95_km": float(np.percentile(loc_err_ref, 95))}
     model.train()
+    release_memory()
     return res
+
+
+def release_memory() -> None:
+    gc.collect()
+    if torch.backends.mps.is_available():
+        torch.mps.empty_cache()
 
 
 def main() -> None:
@@ -109,6 +128,7 @@ def main() -> None:
     ap.add_argument("--no-sim", action="store_true", help="train on real scenes only")
     ap.add_argument("--integrity-only", action="store_true", help="zero all non-integrity features")
     ap.add_argument("--init", default=None, help="pretrained encoder checkpoint")
+    ap.add_argument("--eval-only", default=None, help="evaluate a full checkpoint on --val and exit")
     a = ap.parse_args()
 
     torch.manual_seed(a.seed)
@@ -120,6 +140,12 @@ def main() -> None:
     model = GIST(F, use_graph=not a.no_graph, use_physics=not a.no_physics_loc, use_learned_loc=not a.no_learned_loc).to(dev)
     if a.init:
         model.enc.load_state_dict(torch.load(a.init, map_location=dev))
+    if a.eval_only:
+        model.load_state_dict(torch.load(a.eval_only, map_location=dev))
+        res = evaluate(model, va, dev)
+        print(json.dumps(res, indent=2))
+        Path(a.eval_only).with_name(f"eval_{a.val}.json").write_text(json.dumps(res, indent=2))
+        return
     opt = torch.optim.AdamW(model.parameters(), lr=a.lr, weight_decay=1e-2)
     steps_total = a.epochs * len(tr)
     sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=a.lr, total_steps=max(steps_total, 1), pct_start=0.1)
@@ -145,6 +171,8 @@ def main() -> None:
             opt.step()
             sched.step()
             agg += [l_node.item(), l_step.item(), l_loc.item()]
+            del out, loss, l_node, l_step, l_loc, b
+        release_memory()
         res = evaluate(model, va, dev)
         score = np.mean([res[k]["macro_f1"] for k in ("real", "sim") if k in res])
         history.append({"epoch": ep, "loss": (agg / len(tr)).tolist(), "val": res, "time_s": time.time() - t0})

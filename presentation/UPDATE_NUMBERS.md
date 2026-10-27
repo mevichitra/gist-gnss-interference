@@ -14,6 +14,8 @@ PPTX_SKILL=<pptx skill dir, for apply_theme.js> node presentation/build_deck.js
 - **Final files present:** GIST cells show mean ± std over the seeds found, and the status pill reads `FINAL · N SEEDS · TEST`.
 - **Final files absent (current):** GIST cells come from `gist_s0/best_val.json`, and the pill reads `INTERIM · SEED 0 · VALIDATION`. The footnotes say the baselines are on test days, so the comparison is not like-for-like yet.
 
+`.gitignore` ignores `runs/`, so commit the synced JSONs with `git add -f presentation/data/runs`.
+
 Re-export the PDF afterwards (LibreOffice: `soffice --headless --convert-to pdf GIST_DL_Project.pptx`).
 
 ## Which slide uses which field

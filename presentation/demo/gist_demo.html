@@ -9,22 +9,22 @@
 * { box-sizing:border-box; margin:0 }
 html,body { height:100%; overflow:hidden; background:var(--bg); color:var(--ink); font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif }
 body { display:grid; grid-template-rows:auto 1fr auto; height:100vh; width:100vw }
-header { display:flex; align-items:center; gap:14px 22px; flex-wrap:wrap; padding:10px 18px; border-bottom:1px solid var(--line) }
-h1 { font-size:20px; font-weight:700; letter-spacing:.01em } h1 span { color:var(--muted); font-weight:500; font-size:14px; margin-left:8px }
-.chips { display:flex; gap:6px; flex-wrap:wrap }
-.chips button, select, #play { font:600 13px system-ui; color:var(--ink); background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:6px 12px; cursor:pointer }
+header { display:flex; align-items:center; gap:10px 14px; flex-wrap:nowrap; min-width:0; padding:8px 18px; border-bottom:1px solid var(--line) }
+h1 { white-space:nowrap; font-size:20px; font-weight:700; letter-spacing:.01em } h1 span { color:var(--muted); font-weight:500; font-size:14px; margin-left:8px }
+.chips { display:flex; gap:6px; flex-wrap:nowrap; overflow-x:auto; min-width:0; flex:1 1 auto; scrollbar-width:none }
+.chips button, select, #play { white-space:nowrap; font:600 13px system-ui; color:var(--ink); background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:6px 12px; cursor:pointer }
 .chips button[aria-pressed=true] { background:var(--ink); color:var(--bg); border-color:var(--ink) }
 select { border-radius:8px }
-.right { margin-left:auto; display:flex; align-items:center; gap:12px }
+.right { margin-left:auto; display:flex; align-items:center; gap:10px; flex:none }
 #play { background:var(--x); border-color:var(--x); color:#fff; min-width:96px }
-#clock { font:700 18px ui-monospace,Menlo,monospace; min-width:150px }
+#clock { font:700 18px ui-monospace,Menlo,monospace; min-width:112px; white-space:nowrap }
 .live { width:10px; height:10px; border-radius:50%; background:#ff4040; box-shadow:0 0 8px #ff4040 }
 .paused .live { background:var(--muted); box-shadow:none }
-main { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:10px 18px 0; min-height:0 }
+main { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; padding:10px 18px 0; min-height:0 }
 .pane { position:relative; display:grid; grid-template-rows:auto 1fr; min-height:0; background:var(--sea); border:1px solid var(--line); border-radius:10px; overflow:hidden }
-.pane h2 { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; padding:10px 14px; font-size:16px; background:var(--panel); border-bottom:1px solid var(--line) }
-.pane h2 small { color:var(--muted); font-weight:500; font-size:13px }
-.pane h2 .big { margin-left:auto; font:700 22px ui-monospace,Menlo,monospace }
+.pane h2 { display:flex; align-items:baseline; gap:10px; flex-wrap:nowrap; white-space:nowrap; overflow:hidden; padding:8px 14px; font-size:16px; background:var(--panel); border-bottom:1px solid var(--line) }
+.pane h2 small { color:var(--muted); font-weight:500; font-size:13px; overflow:hidden; text-overflow:ellipsis }
+.pane h2 .big { margin-left:auto; flex:none; font:700 20px ui-monospace,Menlo,monospace }
 svg { width:100%; height:100%; display:block }
 .land { fill:var(--land); stroke:var(--coast); stroke-width:.7 }
 .grid { stroke:var(--coast); stroke-opacity:.35; stroke-dasharray:2 4 }
@@ -32,37 +32,37 @@ svg { width:100%; height:100%; display:block }
 .cell:hover { stroke:#fff; stroke-width:1.5 }
 .em { stroke:var(--x); stroke-width:2.5 }
 .tip { position:fixed; pointer-events:none; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font:13px/1.5 ui-monospace,Menlo,monospace; z-index:9 }
-footer { display:grid; grid-template-columns:1fr auto; gap:8px 24px; align-items:end; padding:10px 18px 12px }
+footer { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,auto); gap:8px 24px; align-items:end; padding:10px 18px 12px }
 .hours { display:grid; grid-template-columns:52px repeat(24,1fr); gap:3px; height:64px; align-items:end }
 .hours button { all:unset; cursor:pointer; height:100%; display:flex; flex-direction:column; justify-content:flex-end; background:var(--panel); border-radius:3px; position:relative }
 .hours button[aria-pressed=true] { outline:2px solid var(--x); outline-offset:1px }
 .hours button i { position:absolute; bottom:-15px; left:0; right:0; text-align:center; font:10px ui-monospace,Menlo,monospace; color:var(--muted); font-style:normal }
 .hours .all { justify-content:center; text-align:center; font:700 11px system-ui; color:var(--muted) }
 .bj { background:var(--jam) } .bs { background:var(--spoof) }
-.legend { display:flex; flex-wrap:wrap; gap:6px 18px; font-size:13px; color:var(--muted); align-items:center; justify-content:flex-end; max-width:560px }
+.legend { display:grid; grid-template-columns:auto auto; gap:4px 16px; font-size:13px; white-space:nowrap; color:var(--muted); align-items:center; justify-content:flex-end; max-width:560px }
 .sw { display:inline-block; width:14px; height:14px; border-radius:3px; vertical-align:-2px; margin-right:6px }
 .legend b { color:var(--ink) }
-.foot2 { grid-column:1/-1; font-size:12px; color:var(--muted); margin-top:8px }
+.foot2 { grid-column:1/-1; font-size:12px; color:var(--muted); margin-top:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
 @media (max-width:900px) { main { grid-template-columns:1fr } html,body { overflow:auto } body { height:auto } .pane { height:70vh } }
 </style></head><body>
 <header>
-  <h1>GIST <span>which planes are being jammed or spoofed, hour by hour</span></h1>
-  <div class="chips" id="regions"></div>
-  <select id="day" aria-label="Day"></select>
+  <h1>GIST <span>GPS jamming &amp; spoofing monitor</span></h1>
+  <select id="regions" aria-label="Region" style="flex:none;font-size:14px"></select><span style="flex:1"></span>
+  <select id="day" aria-label="Day" style="flex:none"></select>
   <div class="right"><span class="live"></span><span id="clock">--:--</span><button id="play">❚❚ Pause</button></div>
 </header>
 <main>
-  <section class="pane"><h2>Simple GPS-health map <small>what public maps (NIC score) see: trouble, but not which kind</small><span class="big" id="nicPct" style="color:var(--nic)"></span></h2><svg id="m1"></svg></section>
-  <section class="pane"><h2>GIST (deep learning) <small>splits trouble into jamming vs spoofing, and guesses the jammer</small><span class="big"><span id="jamPct" style="color:var(--jam)"></span> · <span id="spPct" style="color:var(--spoof)"></span></span></h2><svg id="m2"></svg></section>
+  <section class="pane"><h2>Simple GPS-health map <small>trouble, but not which kind</small><span class="big" id="nicPct" style="color:var(--nic)"></span></h2><svg id="m1"></svg></section>
+  <section class="pane"><h2>GIST (deep learning) <small>jamming vs spoofing + jammer</small><span class="big"><span id="jamPct" style="color:var(--jam)"></span> · <span id="spPct" style="color:var(--spoof)"></span></span></h2><svg id="m2"></svg></section>
 </main>
 <footer>
   <div><div class="hours" id="hours"></div></div>
   <div class="legend">
-    <span><span class="sw" style="background:var(--jam)"></span><b>Jammed</b> GPS blocked by noise</span>
-    <span><span class="sw" style="background:var(--spoof)"></span><b>Spoofed</b> fake GPS, plane confidently wrong</span>
+    <span><span class="sw" style="background:var(--jam)"></span><b>Jammed</b> GPS blocked</span>
+    <span><span class="sw" style="background:var(--spoof)"></span><b>Spoofed</b> fake GPS position</span>
     <span><span class="sw" style="background:var(--ok)"></span>normal traffic</span>
     <span><b style="color:var(--x)">✕</b> estimated jammer position</span>
-    <span><span class="sw" style="background:var(--nic)"></span>low GPS-health share (left map)</span>
+    <span><span class="sw" style="background:var(--nic)"></span>low GPS health (left)</span>
   </div>
   <div class="foot2" id="foot"></div>
 </footer>
@@ -78,9 +78,9 @@ const pct = v => (100 * v).toFixed(0) + "%";
 const hh = h => String(h).padStart(2, "0") + ":00";
 
 // controls
-Object.keys(NAMES).forEach(r => { const b = document.createElement("button"); b.textContent = NAMES[r]; b.dataset.r = r;
-  b.onclick = () => { S.region = r; draw(); }; $("regions").append(b); });
-DAYS.forEach(d => $("day").add(new Option(`${d} (${SPLIT(d)})`, d))); $("day").value = S.day;
+Object.keys(NAMES).forEach(r => $("regions").add(new Option(NAMES[r], r))); $("regions").value = S.region;
+$("regions").onchange = () => { S.region = $("regions").value; draw(); };
+DAYS.forEach(d => $("day").add(new Option(`${d} · ${SPLIT(d).replace(' day','')}`, d))); $("day").value = S.day;
 $("day").onchange = () => { S.day = $("day").value; draw(); };
 const setPlay = p => { S.playing = p; $("play").textContent = p ? "❚❚ Pause" : "▶ Play"; document.body.classList.toggle("paused", !p); };
 $("play").onclick = () => setPlay(!S.playing);
@@ -93,7 +93,11 @@ function agg(rows) {
 function projector(svg) {
   const r = svg.getBoundingClientRect(), W = Math.max(200, r.width), H = Math.max(200, r.height);
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-  const [la0, la1, lo0, lo1] = DATA.regions[S.region], my = la => Math.log(Math.tan(Math.PI / 4 + la * Math.PI / 360)) * 180 / Math.PI;
+  let [la0, la1, lo0, lo1] = DATA.regions[S.region];
+  const day = DATA.days[S.day], ids = new Set(day.rows.filter(r => r[0] === S.region).map(r => r[1]));
+  if (ids.size) { const pts = [...ids].flatMap(id => day.cells[id]); const xs = pts.map(q => q[0]), ys = pts.map(q => q[1]);
+    lo0 = Math.max(lo0, Math.min(...xs) - 0.7); lo1 = Math.min(lo1, Math.max(...xs) + 0.7); la0 = Math.max(la0, Math.min(...ys) - 0.5); la1 = Math.min(la1, Math.max(...ys) + 0.5); }
+  const my = la => Math.log(Math.tan(Math.PI / 4 + la * Math.PI / 360)) * 180 / Math.PI;
   const k = Math.min((W - 24) / (lo1 - lo0), (H - 24) / (my(la1) - my(la0)));
   const ox = (W - k * (lo1 - lo0)) / 2, oy = (H - k * (my(la1) - my(la0))) / 2;
   const p = ([lo, la]) => [ox + k * (lo - lo0), oy + k * (my(la1) - my(la))];
@@ -105,8 +109,8 @@ function base(svg, p) {
   svg.innerHTML = "";
   DATA.land[S.region].forEach(r => el("path", { d: p.d(r), class: "land" }, svg));
   const [la0, la1, lo0, lo1] = p.box;
-  for (let x = Math.ceil(lo0 / 5) * 5; x < lo1; x += 5) { const [a, b] = [p([x, la0]), p([x, la1])]; el("line", { x1: a[0], y1: a[1], x2: b[0], y2: b[1], class: "grid" }, svg); el("text", { x: a[0] + 3, y: a[1] - 4, class: "lbl" }, svg).textContent = x + "°E"; }
-  for (let y = Math.ceil(la0 / 5) * 5; y < la1; y += 5) { const [a, b] = [p([lo0, y]), p([lo1, y])]; el("line", { x1: a[0], y1: a[1], x2: b[0], y2: b[1], class: "grid" }, svg); el("text", { x: a[0] + 3, y: a[1] - 4, class: "lbl" }, svg).textContent = y + "°N"; }
+  for (let x = Math.ceil(lo0 / 2) * 2; x < lo1; x += 2) { const [a, b] = [p([x, la0]), p([x, la1])]; el("line", { x1: a[0], y1: a[1], x2: b[0], y2: b[1], class: "grid" }, svg); el("text", { x: a[0] + 3, y: a[1] - 4, class: "lbl" }, svg).textContent = x + "°E"; }
+  for (let y = Math.ceil(la0 / 2) * 2; y < la1; y += 2) { const [a, b] = [p([lo0, y]), p([lo1, y])]; el("line", { x1: a[0], y1: a[1], x2: b[0], y2: b[1], class: "grid" }, svg); el("text", { x: a[0] + 3, y: a[1] - 4, class: "lbl" }, svg).textContent = y + "°N"; }
 }
 const tip = $("tip");
 function hover(e, id, a) {
@@ -115,7 +119,6 @@ function hover(e, id, a) {
   e.onmouseleave = () => tip.hidden = true;
 }
 function draw() {
-  document.querySelectorAll("#regions button").forEach(b => b.setAttribute("aria-pressed", b.dataset.r === S.region));
   const day = DATA.days[S.day], rows = day.rows.filter(r => r[0] === S.region && (S.hour === null || r[2] === S.hour));
   const A = agg(rows), m1 = $("m1"), m2 = $("m2"), p1 = projector(m1), p2 = projector(m2);
   base(m1, p1); base(m2, p2);

@@ -665,23 +665,24 @@ async function build() {
       return a == null || b == null ? null : a.toFixed(d) + unit + " → " + b.toFixed(d) + unit;
     };
     const ins = [
-      [I.layer, "Graph", R.abl.nograph, [["Real F1", delta(R.abl.nograph, "real.macro_f1", 2)], ["Loc.", delta(R.abl.nograph, "loc_refined.median_km", 1, " km")]],
-        "Without neighbours, a single aircraft cannot tell a local receiver fault from a regional emitter.", ACC[0]],
+      [I.layer, "Graph", R.abl.nograph, [["Real spoof R@1%", delta(R.abl.nograph, "real.spoof_recall_at_1fpr", 2)], ["Loc. p95", delta(R.abl.nograph, "loc_refined.p95_km", 0, " km")]],
+        "Without neighbours, a single aircraft cannot tell a local receiver fault from a regional emitter.", ACC[0], "Neighbours catch spoofing and fix the worst localization misses."],
       [I.shield, "Physics features", R.abl.integ, [["Real spoof R@1%", delta(R.abl.integ, "real.spoof_recall_at_1fpr", 2)], ["Sim F1", delta(R.abl.integ, "sim.macro_f1", 2)]],
-        "The integrity-only variant mirrors what NIC maps see; spoof recall should collapse toward the threshold baseline.", ACC[3]],
+        "The integrity-only variant mirrors what NIC maps see; spoof recall should collapse toward the threshold baseline.", ACC[3], "Spoofers fake integrity fields; physics features catch them."],
       [I.flask, "Simulation", R.abl.nosim, [["Loc.", delta(R.abl.nosim, "loc_refined.median_km", 1, " km")], ["Sim F1", delta(R.abl.nosim, "sim.macro_f1", 2)]],
-        "Only simulated scenes carry emitter positions and step labels; without them the localization head has no target.", ACC[2]]];
-    ins.forEach(([ic, h, run, deltas, hyp, c], i) => {
+        "Only simulated scenes carry emitter positions and step labels; without them the localization head has no target.", ACC[2], "Localization is learned almost entirely from simulation."]];
+    ins.forEach(([ic, h, run, deltas, hyp, c, take], i) => {
       const x = MX + i * 4.15;
       card(s, x, 4.95, 4.0, 1.85);
       circleIcon(s, ic, x + 0.25, 5.15, 0.55, c);
       txt(s, h + (run ? ": full → ablated" : " (hypothesis)"), { x: x + 0.95, y: 5.15, w: 2.95, h: 0.55, bold: true, fontSize: 14, color: c, valign: "middle" });
       const body = run
-        ? deltas.filter(([, v]) => v).map(([k, v]) => ({ text: k + ": " + v, options: { breakLine: true } }))
+        ? [...deltas.filter(([, v]) => v).map(([k, v]) => ({ text: k + ": " + v, options: { breakLine: true } })),
+           { text: take, options: { bold: true, fontSize: 11, color: c } }]
         : [{ text: hyp }];
-      txt(s, body, { x: x + 0.3, y: 5.8, w: 3.5, h: 0.95, fontSize: 12 });
+      txt(s, body, { x: x + 0.3, y: 5.75, w: 3.5, h: 1.0, fontSize: 12, valign: "top" });
     });
-    s.addNotes("Each ablation retrains GIST with one component removed, using the same data, seed and 15 epochs as the interim model, then scores it on the 2026 test days. Cards show full → ablated. The no-simulation variant has no localization target, so its localization number shows how much the physics layer alone recovers.");
+    s.addNotes("Each ablation retrains GIST with one component removed, using the same data, seed and 15 epochs as the interim model, then scores it on the 2026 test days. Cards show full → ablated. Integrity-only: real spoof recall falls from 0.83 to 0.29, so the physics features are what catch spoofing. No graph: spoof recall drops 0.83 to 0.74 and the 95th-percentile localization error grows, though the median is similar. No simulation: localization error goes from about 18 km to about 178 km, because only simulated scenes carry emitter positions; real-data classification is unchanged.");
   }
 
   // ============================================================ 20. Case study

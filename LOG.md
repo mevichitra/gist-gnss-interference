@@ -56,3 +56,12 @@
 - With 5 % benign low-NIC distractors (160 scenes): GIST 27.2 km (p95 182) vs NLS 42.5 (p95 315).
 - Real EMED 2024-07-01 (training-period day): jammer estimates cluster on the Lebanon–Israel coast near the reported source region (qualitative only).
 - Interim demo map published (claude.ai artifact, seed 0). Final pipeline (`scripts/final.sh`) will regenerate everything with 34 days × 3 seeds.
+
+## 2026-11-05 Ablations (seed 0, 15 epochs, 2026 test days)
+| variant | real F1 | real spoof R@1% | sim F1 | loc median / p95 km |
+|---|---|---|---|---|
+| full (gist_s0) | 0.876 | 0.826 | 0.997 | 18.4 / 164 |
+| no graph | 0.855 | 0.741 | 0.994 | 16.5 / 212 |
+| integrity only | 0.751 | 0.294 | 0.822 | 18.5 / 179 |
+| no sim | 0.881 | 0.767 | 0.815 | 178.2 / 350 |
+Physics features carry spoof detection; simulation carries localization; graph mainly helps spoofing and the localization tail.

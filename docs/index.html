@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GIST · GNSS Interference from ADS-B</title>
+<style>
+/* Layout: single centred column; one primary action (live demo), then the other materials. */
+:root { --bg: #f6f8f9; --fg: #1d2a33; --muted: #5b6b75; --line: #d4dee3; --card: #ffffff; --accent: #a3206f; --jam: #d9541e; --spoof: #6b3fb3 }
+@media (prefers-color-scheme: dark) { :root { --bg: #0e1a24; --fg: #e4ebef; --muted: #9aabb6; --line: #2a3b48; --card: #14232f; --accent: #e25aa8; --jam: #ff7a3d; --spoof: #a684ee; color-scheme: dark } }
+* { box-sizing: border-box }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+  padding: 48px max(16px, env(safe-area-inset-left)) 48px max(16px, env(safe-area-inset-right)) }
+main { max-width: 720px; margin: 0 auto; display: grid; gap: 28px }
+h1 { font-size: 34px; line-height: 1.1; margin: 0; letter-spacing: -.01em; text-wrap: balance }
+.sub { color: var(--muted); margin: 8px 0 0; max-width: 60ch }
+.tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px }
+.tag { font-size: 12px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line) }
+.tag.j { color: var(--jam) } .tag.s { color: var(--spoof) }
+a.primary { display: block; padding: 20px 22px; border-radius: 10px; background: var(--accent); color: #fff; text-decoration: none }
+a.primary b { font-size: 20px; display: block } a.primary span { opacity: .9; font-size: 14px }
+.list { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden }
+.list a { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 14px 18px; background: var(--card); color: var(--fg); text-decoration: none }
+.list a:hover { background: var(--bg) } .list small { grid-column: 1; color: var(--muted); font-size: 13px } .list em { grid-row: 1 / 3; grid-column: 2; align-self: center; font-style: normal; color: var(--muted) }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px }
+.note { color: var(--muted); font-size: 13.5px; border-top: 1px solid var(--line); padding-top: 18px }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>GIST: GPS jamming &amp; spoofing seen through aircraft</h1>
+    <p class="sub">A deep-learning system that detects, classifies and localizes GNSS interference from crowdsourced ADS-B, trained without manual labels. Final-year Deep Learning project, Bangalore Institute of Technology.</p>
+    <div class="tags"><span class="tag j">jamming</span><span class="tag s">spoofing</span><span class="tag">Transformer + graph attention</span><span class="tag">weak supervision</span></div>
+  </header>
+
+  <a class="primary" href="demo/"><b>Open the live demo →</b><span>Full-screen replay: simple GPS-health map vs GIST, hour by hour. Best on a laptop or projector.</span></a>
+
+  <nav class="list" aria-label="Project materials">
+    <a href="GIST_DL_Project.pdf"><span>Presentation slides (PDF)</span><small>26 slides, the deck used for the project review</small><em>PDF</em></a>
+    <a href="https://github.com/mevichitra/gist-gnss-interference/raw/master/presentation/GIST_DL_Project.pptx"><span>Presentation slides (PowerPoint)</span><small>Editable deck with speaker notes on every slide</small><em>PPTX</em></a>
+    <a href="https://github.com/mevichitra/gist-gnss-interference/blob/master/presentation/ELI5.md"><span>Presenter notes</span><small>Plain-language explanation, demo script, likely questions</small><em>MD</em></a>
+    <a href="map/"><span>Interactive map</span><small>Pick a day and region, switch GIST vs the NIC baseline, scrub hours</small><em>HTML</em></a>
+    <a href="https://github.com/mevichitra/gist-gnss-interference"><span>Source code</span><small>Data pipeline, labels, simulator, model, training, paper draft</small><em>GitHub</em></a>
+  </nav>
+
+  <p class="note">Results shown are <b>interim</b> (single seed); the final multi-seed evaluation is pending. Data: ADSB.lol and contributors, Open Database License (ODbL). Labels are weakly supervised and real-world jammer localization is not yet validated.</p>
+</main>
+</body>
+</html>

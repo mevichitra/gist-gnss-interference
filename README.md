@@ -1,5 +1,15 @@
 # GIST — GNSS Interference Spatio-Temporal network
 
+**▶ Live demo & slides: https://mevichitra.github.io/gist-gnss-interference/**
+
+| For the presenter | |
+|---|---|
+| Live demo (full-screen, offline-capable) | [`docs/demo/`](https://mevichitra.github.io/gist-gnss-interference/demo/), or open [`presentation/demo/index.html`](presentation/demo/index.html) locally |
+| Slides | [`presentation/GIST_DL_Project.pptx`](presentation/GIST_DL_Project.pptx) (speaker notes on every slide) · [PDF](presentation/GIST_DL_Project.pdf) |
+| Presenter notes | [`presentation/ELI5.md`](presentation/ELI5.md) |
+
+> Results in the deck and demo are **interim (seed 0)**; the final multi-seed run is pending.
+
 Detect, classify (jamming vs spoofing) and localize GNSS interference from crowdsourced ADS-B,
 with no manual labels. Final-year deep learning project + paper. Full design: [PLAN.md](PLAN.md);
 decisions and dead ends: [LOG.md](LOG.md).

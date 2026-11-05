@@ -18,3 +18,4 @@ report/*.lof
 report/*.lot
 report/*.out
 viz_build/*.json
+.claude/

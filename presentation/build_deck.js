@@ -40,8 +40,10 @@ function loadResults() {
   const baseD = readJSON(path.join(RUNS, "baselines_test_distract.json"));
   const finals = [0, 1, 2].map((s) => readJSON(path.join(RUNS, `gist_final_s${s}`, "eval_test.json"))).filter(Boolean);
   const finalsD = [0, 1, 2].map((s) => readJSON(path.join(RUNS, `gist_final_s${s}`, "eval_test_distract.json"))).filter(Boolean);
+  const s0Test = readJSON(path.join(RUNS, "gist_s0", "eval_test.json"));
+  const s0TestD = readJSON(path.join(RUNS, "gist_s0", "eval_test_distract.json"));
   const abl = {
-    full: finals[0] || null,
+    full: finals[0] || s0Test || null,
     nograph: readJSON(path.join(RUNS, "gist_nograph_s0", "eval_test.json")),
     integ: readJSON(path.join(RUNS, "gist_integ_s0", "eval_test.json")),
     nosim: readJSON(path.join(RUNS, "gist_nosim_s0", "eval_test.json")),
@@ -52,14 +54,20 @@ function loadResults() {
     gist = agg(finals); gistD = finalsD.length ? agg(finalsD) : () => null;
     status = { final: true, tag: `FINAL · ${finals.length} SEED${finals.length > 1 ? "S" : ""} · TEST`, split: "test (2026 days)" };
   } else {
-    const v = readJSON(path.join(RUNS, "gist_s0", "best_val.json"));
-    gist = (k) => { const x = get(v, k); return x == null ? null : { m: x, s: 0, n: 1 }; };
-    gistD = () => null;
-    status = { final: false, tag: "INTERIM · SEED 0 · VALIDATION", split: "validation (2025-07..12 days)" };
+    // Interim: seed-0 model scored on the same 2026 test days as the baselines (like-for-like).
+    const one = (v) => (k) => { const x = get(v, k); return x == null ? null : { m: x, s: 0, n: 1 }; };
+    const v = s0Test || readJSON(path.join(RUNS, "gist_s0", "best_val.json"));
+    gist = one(v);
+    gistD = s0TestD ? one(s0TestD) : () => null;
+    status = s0Test
+      ? { final: false, tag: "INTERIM · SEED 0 · TEST", split: "test (2026 days)" }
+      : { final: false, tag: "INTERIM · SEED 0 · VALIDATION", split: "validation (2025-07..12 days)" };
   }
   return { base, baseD, gist, gistD, abl, status };
 }
 const R = loadResults();
+// Pixel size of assets/case_BAL_2026-01-01_interim.png (cropped from runs/gist_s0/fig/), for its aspect ratio.
+const CASE_W = 1436, CASE_H = 436;
 const f2 = (x) => (x == null ? "–" : x.toFixed(2));
 const f1 = (x) => (x == null ? "–" : x.toFixed(1));
 const g2 = (k) => { const r = R.gist(k); return r == null ? "pending" : r.n > 1 ? `${r.m.toFixed(2)} ± ${r.s.toFixed(2)}` : r.m.toFixed(2); };
@@ -602,7 +610,7 @@ async function build() {
       ...bullets([
         "The integrity threshold finds jamming (AP " + f2(B.gpsjam.real.jam_ap) + ") but spoof recall is " + f2(B.gpsjam.real.spoof_recall_at_1fpr) + ": it cannot see spoofing.",
         "GIST separates the two classes; spoof recall @1% FPR " + g2("real.spoof_recall_at_1fpr") + " on real traffic.",
-        R.status.final ? "Mean ± std over " + R.gist("real.macro_f1").n + " seeds on the 2026 test days." : "* GIST = interim seed-0 model on the validation days (n = 18,348 windows, 132 spoofed); baselines on test days. Final 3-seed test numbers will replace this row.",
+        R.status.final ? "Mean ± std over " + R.gist("real.macro_f1").n + " seeds on the 2026 test days." : "* GIST = interim seed-0 model on the same 2026 test days as the baselines (n = " + Math.round(gv("real.n")).toLocaleString("en-US") + " windows, " + Math.round(gv("real.n_spoof")) + " spoofed). Final 3-seed numbers will replace this row.",
       ], { gap: 4 })], { x: 8.15, y: 4.25, w: 4.5, h: 2.6, fontSize: 12 });
     s.addNotes("Real = scored against label-model targets (weak labels, not ground truth). Sim = exact simulated truth. Values read from data/runs/*.json by build_deck.js.");
   }
@@ -629,10 +637,10 @@ async function build() {
     txt(s, [{ text: "Distractor robustness", options: { bold: true, color: C.accent3, breakLine: true } },
       ...bullets([
         "Adding 5 % benign low-NIC aircraft (affected by something else) moves NLS from " + f1(L.nls.median_km) + " to " + f1(LD.nls.median_km) + " km median (+" + nlsUp + " %).",
-        gd == null ? "GIST on the distractor split: pending the final pipeline (eval_test_distract.json)." : "GIST on the same split: " + g1("loc_refined.median_km", R.gistD) + " km median.",
+        gd == null ? "GIST on the distractor split: pending the final pipeline (eval_test_distract.json)." : "GIST on the same scenes: " + g1("loc_refined.median_km", R.gistD) + " km median (p95 " + g1("loc_refined.p95_km", R.gistD) + "): it learns to discount aircraft whose low NIC is unrelated to the emitter.",
         "Simulated jammers only; real-world localization is not yet validated.",
       ], { gap: 4 })], { x: 7.35, y: 4.45, w: 5.3, h: 2.35, fontSize: 12 });
-    txt(s, R.status.final ? "GIST: mean ± std over seeds, test split." : "* GIST interim: seed 0, validation scenes (n = 167); baselines: test scenes (n = 334 clean, 160 distractor). Not yet like-for-like.",
+    txt(s, R.status.final ? "GIST: mean ± std over seeds, test split." : "* GIST interim: seed 0, on the same 2026 test scenes as the baselines (n = " + Math.round(gv("loc_refined.n")) + " clean, " + (gv("loc_refined.n", R.gistD) == null ? "–" : Math.round(gv("loc_refined.n", R.gistD))) + " distractor).",
       { x: MX, y: 5.2, w: 6.4, h: 0.6, fontSize: 11, italic: true, color: HEX.muted });
     card(s, MX, 5.9, 6.4, 0.95, HEX.lt2);
     txt(s, [{ text: "Information limit. ", options: { bold: true, color: C.accent1 } }, { text: "Even oracle step labels reach only 17.2 km median on the dev sims: receiver tolerance spread and unknown emitter height bound accuracy." }],
@@ -643,40 +651,53 @@ async function build() {
   // ============================================================ 19. Ablations
   {
     const s = content("Results", "Ablations: What Each Component Buys", { kicker: "17 · RESULTS" });
-    pill(s, R.abl.full ? "FINAL · SEED 0 · TEST" : "PENDING FINAL PIPELINE", W - MX - 3.6, 0.3, 3.6, R.abl.full ? HEX.accent6 : HEX.muted);
+    const anyAbl = R.abl.nograph || R.abl.integ || R.abl.nosim;
+    pill(s, !anyAbl ? "ABLATIONS RUNNING" : R.status.final ? "FINAL · SEED 0 · TEST" : "INTERIM · SEED 0 · TEST", W - MX - 3.6, 0.3, 3.6, anyAbl ? HEX.accent6 : HEX.muted);
     const cell = (r, k, d = 2) => { const v = r ? get(r, k) : null; return v == null ? "pending" : v.toFixed(d); };
     const rows = [["GIST (full)", R.abl.full, "—"], ["w/o spatial graph attention", R.abl.nograph, "does sharing evidence across aircraft help?"],
       ["integrity fields only", R.abl.integ, "are physics features what catches spoofing?"], ["w/o simulated training scenes", R.abl.nosim, "is the simulator needed for localization?"]];
     table(s, [["Variant", "Question", "Real F1", "Real Spoof R@1%", "Sim F1", "Loc. median km"],
       ...rows.map(([n, r, q]) => [n, q, cell(r, "real.macro_f1"), cell(r, "real.spoof_recall_at_1fpr"), cell(r, "sim.macro_f1"), cell(r, "loc_refined.median_km", 1)])],
       { x: MX, y: 1.6, w: 12.33, colW: [2.9, 4.13, 1.2, 1.6, 1.1, 1.4], fontSize: 13, rowH: 0.6 });
-    const ins = [[I.layer, "Graph", "Without neighbours, a single aircraft cannot tell a local receiver fault from a regional emitter.", ACC[0]],
-      [I.shield, "Physics features", "The integrity-only variant mirrors what NIC maps see; spoof recall should collapse toward the threshold baseline.", ACC[3]],
-      [I.flask, "Simulation", "Only simulated scenes carry emitter positions and step labels; without them the localization head has no target.", ACC[2]]];
-    ins.forEach(([ic, h, b, c], i) => {
+    // Each card states the measured effect when the run exists, otherwise the hypothesis being tested.
+    const delta = (r, k, d, unit = "") => {
+      const a = R.abl.full ? get(R.abl.full, k) : null, b = r ? get(r, k) : null;
+      return a == null || b == null ? null : a.toFixed(d) + unit + " → " + b.toFixed(d) + unit;
+    };
+    const ins = [
+      [I.layer, "Graph", R.abl.nograph, [["Real F1", delta(R.abl.nograph, "real.macro_f1", 2)], ["Loc.", delta(R.abl.nograph, "loc_refined.median_km", 1, " km")]],
+        "Without neighbours, a single aircraft cannot tell a local receiver fault from a regional emitter.", ACC[0]],
+      [I.shield, "Physics features", R.abl.integ, [["Real spoof R@1%", delta(R.abl.integ, "real.spoof_recall_at_1fpr", 2)], ["Sim F1", delta(R.abl.integ, "sim.macro_f1", 2)]],
+        "The integrity-only variant mirrors what NIC maps see; spoof recall should collapse toward the threshold baseline.", ACC[3]],
+      [I.flask, "Simulation", R.abl.nosim, [["Loc.", delta(R.abl.nosim, "loc_refined.median_km", 1, " km")], ["Sim F1", delta(R.abl.nosim, "sim.macro_f1", 2)]],
+        "Only simulated scenes carry emitter positions and step labels; without them the localization head has no target.", ACC[2]]];
+    ins.forEach(([ic, h, run, deltas, hyp, c], i) => {
       const x = MX + i * 4.15;
       card(s, x, 4.95, 4.0, 1.85);
       circleIcon(s, ic, x + 0.25, 5.15, 0.55, c);
-      txt(s, h + " (hypothesis)", { x: x + 0.95, y: 5.15, w: 2.95, h: 0.55, bold: true, fontSize: 14, color: c, valign: "middle" });
-      txt(s, b, { x: x + 0.3, y: 5.8, w: 3.5, h: 0.95, fontSize: 12 });
+      txt(s, h + (run ? ": full → ablated" : " (hypothesis)"), { x: x + 0.95, y: 5.15, w: 2.95, h: 0.55, bold: true, fontSize: 14, color: c, valign: "middle" });
+      const body = run
+        ? deltas.filter(([, v]) => v).map(([k, v]) => ({ text: k + ": " + v, options: { breakLine: true } }))
+        : [{ text: hyp }];
+      txt(s, body, { x: x + 0.3, y: 5.8, w: 3.5, h: 0.95, fontSize: 12 });
     });
-    s.addNotes("Ablation runs: gist_nograph_s0, gist_integ_s0, gist_nosim_s0 (scripts/final.sh). Cells fill automatically from eval_test.json once the pipeline finishes. The three cards are hypotheses to be confirmed or rejected by these runs.");
+    s.addNotes("Each ablation retrains GIST with one component removed, using the same data, seed and 15 epochs as the interim model, then scores it on the 2026 test days. Cards show full → ablated. The no-simulation variant has no localization target, so its localization number shows how much the physics layer alone recovers.");
   }
 
   // ============================================================ 20. Case study
   {
     const s = content("Results", "Case Study: Baltic Sea, 1 January 2026", { kicker: "18 · CASE STUDY" });
-    pill(s, "DRY-RUN MODEL · PIPELINE CHECK", W - MX - 3.6, 0.3, 3.6, HEX.accent3);
-    s.addImage({ path: path.join(HERE, "assets", "case_BAL_2026-01-01_panels.png"), x: MX, y: 1.5, w: 12.33, h: 12.33 * 458 / 1463, altText: "Three hexagon maps of the Baltic on 2026-01-01: baseline share of NIC ≤ 6, GIST P(jammed) with 39 jammer estimates and the reported Kaliningrad source, and GIST P(spoofed), which is near zero" });
+    pill(s, "INTERIM MODEL · HELD-OUT TEST DAY", W - MX - 3.6, 0.3, 3.6, HEX.accent6);
+    s.addImage({ path: path.join(HERE, "assets", "case_BAL_2026-01-01_interim.png"), x: MX, y: 1.5, w: 12.33, h: 12.33 * CASE_H / CASE_W, altText: "Three hexagon maps of the Baltic on 2026-01-01: baseline share of NIC ≤ 6, GIST P(jammed) with a jamming footprint centred on the reported Kaliningrad source and 169 jammer estimates, and GIST P(spoofed), which is near zero" });
     const notes = [["Baseline", "Share of aircraft with NIC ≤ 6 per hexagon: the gpsjam-style view.", ACC[1]],
-      ["GIST P(jammed)", "Same region, per-aircraft probabilities; 39 jammer estimates scattered around the reported Kaliningrad source (±150 km).", ACC[2]],
+      ["GIST P(jammed)", "The jamming footprint is centred on the reported Kaliningrad source (±150 km). The 169 jammer estimates are spread out: real-world localization is not validated yet.", ACC[2]],
       ["GIST P(spoofed)", "Near zero everywhere: consistent with the Baltic being a jamming region, not spoofing.", ACC[5]]];
     notes.forEach(([h, b, c], i) => {
       const x = MX + i * 4.15;
       card(s, x, 5.55, 4.0, 1.3);
       txt(s, [{ text: h, options: { bold: true, color: c, breakLine: true } }, { text: b, options: { fontSize: 12 } }], { x: x + 0.2, y: 5.62, w: 3.6, h: 1.18, fontSize: 14 });
     });
-    s.addNotes("Figure from runs/dryrun/fig/case_BAL_2026-01-01.png, made with the dry-run checkpoint to test the figure pipeline. The final figure will come from paper/figures/ after the final model. The reported source has ±150 km uncertainty, so this is qualitative only.");
+    s.addNotes("Figure from runs/gist_s0/fig/case_BAL_2026-01-01.png: the interim seed-0 model run over every aircraft on a held-out test day (every third 10-minute window). Point out that the orange footprint sits around Kaliningrad while the simple map shows similar coverage but cannot separate spoofing. Be honest that the individual jammer estimates scatter; the Denver 2022 ground truth (OpenSky) is the planned real-world test. The reported source has ±150 km uncertainty, so this is qualitative.");
   }
 
   // ============================================================ 21. Challenges and lessons
@@ -705,11 +726,11 @@ async function build() {
   // ============================================================ 22. Limitations
   {
     const s = content("Conclusion", "Limitations (Stated Honestly)", { kicker: "20 · LIMITATIONS" });
-    const lim = [["Weak labels are not ground truth", "Real-traffic scores measure agreement with our physics assumptions. The MLAT LF is held out as an independent check; spoofed windows are few (132 in validation)."],
+    const lim = [["Weak labels are not ground truth", "Real-traffic scores measure agreement with our physics assumptions. The MLAT LF is held out as an independent check; spoofed windows are few (374 in the 2026 test days)."],
       ["Simulation is simplified", "Free-space Friis loss, a coarse antenna model and a Gaussian receiver tolerance. Sim scores near 1.0 show the model learns the simulator, not that it is solved."],
       ["Real-world localization unvalidated", "Localization numbers are on simulated jammers. The only real anchor so far (Kaliningrad) has ±150 km uncertainty; the Denver 2022 event with a known site needs OpenSky data."],
       ["Uneven receiver coverage", "Crowdsourced receivers are sparse over parts of the Middle East and South Asia, so detection there is biased toward covered airspace."],
-      ["Interim numbers", "Until the 3-seed pipeline finishes, GIST is reported for seed 0 on validation days while baselines use test days."]];
+      ["Interim numbers", "Results come from one seed trained on two days of data. The 34-day, 3-seed run is pending."]];
     lim.forEach(([h, b], i) => {
       const y = 1.55 + i * 1.04;
       card(s, MX, y, 12.33, 0.92);
@@ -724,7 +745,7 @@ async function build() {
   {
     const s = content("Conclusion", "Conclusion", { kicker: "21 · CONCLUSION" });
     card(s, MX, 1.55, 12.33, 1.75);
-    txt(s, "GIST shows that crowdsourced ADS-B carries enough physical redundancy to separate GNSS spoofing from jamming without a single hand-drawn label. Physics-consistency features expose spoofed aircraft that report high integrity; a Transformer with spatial graph attention turns them into per-aircraft classes; and a differentiable Friis / radio-horizon layer localizes simulated jammers with accuracy comparable to least squares (22.1 vs 23.9 km median on the same dev scenes); robustness to unrelated low-integrity aircraft is being measured in the final runs.",
+    txt(s, "GIST shows that crowdsourced ADS-B carries enough physical redundancy to separate GNSS spoofing from jamming without a single hand-drawn label. Physics-consistency features expose spoofed aircraft that report high integrity; a Transformer with spatial graph attention turns them into per-aircraft classes; and a differentiable Friis / radio-horizon layer localizes simulated jammers more accurately than least squares (" + g1("loc_refined.median_km") + " vs " + f1(R.base.localization.nls.median_km) + " km median on the same test scenes) and degrades less when unrelated low-integrity aircraft are present (" + g1("loc_refined.median_km", R.gistD) + " vs " + f1(R.baseD.localization.nls.median_km) + " km).",
       { x: MX + 0.3, y: 1.65, w: 11.7, h: 1.55, fontSize: 14, valign: "middle" });
     const kp = [[I.eye, "Sees spoofing", "Spoof recall @1% FPR " + g2("real.spoof_recall_at_1fpr") + " vs " + f2(R.base.gpsjam.real.spoof_recall_at_1fpr) + " for the NIC threshold.", ACC[3]],
       [I.tag, "No manual labels", "10 physics LFs + Dawid–Skene; simulator for exact targets.", ACC[5]],
@@ -736,7 +757,7 @@ async function build() {
       txt(s, h, { x: x + 0.25, y: 4.5, w: 3.5, h: 0.4, bold: true, fontSize: 16, color: c, fontFace: THEME.headFontFace });
       txt(s, b, { x: x + 0.25, y: 4.92, w: 3.5, h: 0.75, fontSize: 13 });
     });
-    txt(s, R.status.final ? "Numbers: mean over seeds on the 2026 test days." : "Numbers: interim seed-0 model on validation days; to be replaced by final 3-seed test results.",
+    txt(s, R.status.final ? "Numbers: mean over seeds on the 2026 test days." : "Numbers: interim seed-0 model on the 2026 test days; final 3-seed results pending.",
       { x: MX, y: 5.95, w: 12, h: 0.3, fontSize: 11, italic: true, color: HEX.muted });
     s.addNotes("Close on the main message: the redundancy between independent sensors on hundreds of aircraft is what makes spoofing detectable.");
   }
